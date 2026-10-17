@@ -6,6 +6,10 @@
 
 > Status: 0.1 — early. Works on single-file compositions; see [Limitations](#limitations).
 
+![The same slide, hand-timed and then timed with readpace: words light up at the simulated reading pace](docs/assets/demo.gif)
+
+*The same slide twice. Words light up at the pace of a simulated reader. Hand-timed, the slide is gone before the reader gets there; with readpace it is read to the end. [Full demo video (1:41)](https://github.com/Jeuners/readpace/releases/download/v0.1.0/readpace-demo.mp4). Built with HyperFrames; backgrounds generated with Krea 2 via ComfyUI.*
+
 `readpace` plays your composition in headless Chromium, measures when each block of text is actually readable, simulates a viewer reading it, and tells you which slides disappear before anyone could finish them. It can then re-time the scenes for you, and calibrate its reading model against real people.
 
 ```
