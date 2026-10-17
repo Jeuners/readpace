@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>readpace — calibrate reading time</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; background: #070a10; color: #e9eef8; font-family: -apple-system, "Helvetica Neue", Arial, sans-serif; }
+  #stage { position: absolute; inset: 0 0 72px 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  #frame { flex: none; width: 1920px; height: 1080px; border: 0; transform-origin: center center; background: #000; }
+  #bar { position: absolute; left: 0; right: 0; bottom: 0; height: 72px; display: flex; align-items: center; gap: 24px; padding: 0 28px; background: #0e1420; border-top: 1px solid #26324a; font-size: 18px; }
+  #bar b { color: #3ff08f; }
+  #msg { flex: 1; }
+  .key { font-family: Menlo, monospace; border: 1px solid #26324a; border-radius: 6px; padding: 2px 10px; background: #070a10; }
+  #overlay { position: absolute; inset: 0 0 72px 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; background: rgba(7,10,16,0.92); text-align: center; font-size: 26px; line-height: 1.5; }
+  #overlay h1 { font-size: 44px; }
+  #overlay small { color: #9aa8c2; font-size: 20px; }
+</style>
+</head>
+<body>
+<div id="stage"><iframe id="frame"></iframe></div>
+<div id="overlay"></div>
+<div id="bar"><div id="msg">loading …</div><div id="prog"></div></div>
+<script type="module">
+// Per scene: Space starts it, the scene plays in real time and holds just before
+// its exit, Space again once you have finished reading. Time is measured from
+// the moment the first block is readable (same reference as the model).
+// N skips a scene. Esc stops and saves what has been measured so far.
+const plan = await (await fetch("/plan.json")).json();
+const frame = document.getElementById("frame");
+const overlay = document.getElementById("overlay");
+const msg = document.getElementById("msg");
+const prog = document.getElementById("prog");
+frame.src = "/composition/index.html";
+await new Promise((r) => (frame.onload = r));
+const win = frame.contentWindow;
+await new Promise((r) => { const t = setInterval(() => { if (win.__timelines && Object.keys(win.__timelines).length) { clearInterval(t); r(); } }, 50); });
+const tls = Object.values(win.__timelines);
+const clips = [...win.document.querySelectorAll("[data-start]")].filter((e) => !e.hasAttribute("data-composition-id"));
+
+function fit() {
+  const st = document.getElementById("stage").getBoundingClientRect();
+  frame.style.transform = `scale(${Math.min(st.width / 1920, st.height / 1080)})`;
+}
+addEventListener("resize", fit); fit();
+
+function seek(t) {
+  tls.forEach((tl) => tl.seek(t, false));
+  for (const c of clips) {
+    const s = +c.dataset.start, e = s + +c.dataset.duration;
+    c.style.visibility = t >= s && t < e ? "" : "hidden";
+  }
+}
+seek(0);
+
+const results = [];
+let i = 0, state = "idle", t0 = 0, raf = 0, sc = null;
+
+function show(html) { overlay.innerHTML = html; overlay.style.display = "flex"; }
+function hide() { overlay.style.display = "none"; }
+function intro() {
+  sc = plan.scenes[i];
+  prog.textContent = `Scene ${i + 1} / ${plan.scenes.length}`;
+  show(`<h1>Scene ${i + 1} / ${plan.scenes.length}</h1>
+        <div>Read the slide the way you would while scrolling a feed.<br>
+        Press <span class="key">Space</span> as soon as you have <b>finished reading</b>.</div>
+        <small><span class="key">Space</span> start · <span class="key">N</span> skip · <span class="key">Esc</span> finish</small>`);
+  msg.innerHTML = "ready";
+  seek(sc.start);
+  state = "intro";
+}
+function play() {
+  hide();
+  state = "play";
+  t0 = performance.now();
+  msg.innerHTML = "playing … <b>Space</b> = finished reading";
+  const loop = () => {
+    const t = Math.min(sc.start + (performance.now() - t0) / 1000, sc.holdAt);
+    seek(t);
+    if (t >= sc.holdAt) msg.innerHTML = "holding — press <b>Space</b> once you have finished reading";
+    raf = requestAnimationFrame(loop);
+  };
+  loop();
+}
+function done(skipped) {
+  cancelAnimationFrame(raf);
+  if (!skipped) {
+    const t = sc.start + (performance.now() - t0) / 1000;
+    results.push({ scene: sc.scene, factor: sc.factor, measured: +(t - sc.firstReady).toFixed(3),
+                   predicted: sc.readTime, predictedUnfactored: sc.readTimeUnfactored });
+  }
+  i++;
+  i < plan.scenes.length ? intro() : finish();
+}
+async function finish() {
+  state = "done";
+  prog.textContent = "";
+  show(`<h1>Saving …</h1>`);
+  const r = await fetch("/result", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ results }) });
+  show(`<h1>Done ✓</h1><div>${results.length} measurements saved.</div>
+        <small>${await r.text()}</small><small>You can close this window.</small>`);
+  msg.textContent = "done";
+}
+addEventListener("keydown", (e) => {
+  if (state === "done") return;
+  if (e.key === "Escape") { cancelAnimationFrame(raf); finish(); return; }
+  if (e.key === "n" || e.key === "N") { if (state !== "idle") done(true); return; }
+  if (e.code !== "Space") return;
+  e.preventDefault();
+  if (state === "intro") play();
+  else if (state === "play") {
+    const t = sc.start + (performance.now() - t0) / 1000;
+    if (t < sc.firstReady) return;  // nothing readable yet
+    done(false);
+  }
+});
+intro();
+</script>
+</body>
+</html>

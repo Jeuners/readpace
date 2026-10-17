@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="360" viewBox="0 0 880 360" font-family="-apple-system,Segoe UI,Helvetica,Arial,sans-serif">
+<style>.t{fill:#57606a}.g{stroke:#d0d7de}@media (prefers-color-scheme:dark){.t{fill:#9198a1}.g{stroke:#30363d}}</style>
+<text x="60" y="24" font-size="16" font-weight="600" class="t">Seconds a slide is readable vs. seconds it needs (example: spf-dmarc)</text>
+<line x1="60" x2="860" y1="290.0" y2="290.0" class="g" stroke-width="1"/>
+<text x="50" y="294.0" font-size="12" text-anchor="end" class="t">0s</text>
+<line x1="60" x2="860" y1="231.5" y2="231.5" class="g" stroke-width="1"/>
+<text x="50" y="235.5" font-size="12" text-anchor="end" class="t">4s</text>
+<line x1="60" x2="860" y1="173.0" y2="173.0" class="g" stroke-width="1"/>
+<text x="50" y="177.0" font-size="12" text-anchor="end" class="t">8s</text>
+<line x1="60" x2="860" y1="114.5" y2="114.5" class="g" stroke-width="1"/>
+<text x="50" y="118.5" font-size="12" text-anchor="end" class="t">12s</text>
+<line x1="60" x2="860" y1="56.0" y2="56.0" class="g" stroke-width="1"/>
+<text x="50" y="60.0" font-size="12" text-anchor="end" class="t">16s</text>
+<rect x="99.0" y="238.8" width="38" height="51.2" rx="3" fill="#e5534b"/>
+<text x="118.0" y="282.0" font-size="12" font-weight="600" text-anchor="middle" fill="#ffffff">3.5</text>
+<rect x="143.0" y="213.9" width="38" height="76.0" rx="3" fill="#3fb950"/>
+<text x="162.0" y="282.0" font-size="12" font-weight="600" text-anchor="middle" fill="#ffffff">5.2</text>
+<line x1="90.0" x2="190.0" y1="218.3" y2="218.3" stroke="#d29922" stroke-width="3" stroke-dasharray="6 4"/>
+<text x="140.0" y="310" font-size="12.5" text-anchor="middle" class="t">S1 hook</text>
+<rect x="259.0" y="225.6" width="38" height="64.4" rx="3" fill="#e5534b"/>
+<text x="278.0" y="282.0" font-size="12" font-weight="600" text-anchor="middle" fill="#ffffff">4.4</text>
+<rect x="303.0" y="137.9" width="38" height="152.1" rx="3" fill="#3fb950"/>
+<text x="322.0" y="282.0" font-size="12" font-weight="600" text-anchor="middle" fill="#ffffff">10.4</text>
+<line x1="250.0" x2="350.0" y1="142.3" y2="142.3" stroke="#d29922" stroke-width="3" stroke-dasharray="6 4"/>
+<text x="300.0" y="310" font-size="12.5" text-anchor="middle" class="t">S2 spoofed mail</text>
+<rect x="419.0" y="206.6" width="38" height="83.4" rx="3" fill="#e5534b"/>
+<text x="438.0" y="282.0" font-size="12" font-weight="600" text-anchor="middle" fill="#ffffff">5.7</text>
+<rect x="463.0" y="82.3" width="38" height="207.7" rx="3" fill="#3fb950"/>
+<text x="482.0" y="282.0" font-size="12" font-weight="600" text-anchor="middle" fill="#ffffff">14.2</text>
+<line x1="410.0" x2="510.0" y1="88.2" y2="88.2" stroke="#d29922" stroke-width="3" stroke-dasharray="6 4"/>
+<text x="460.0" y="310" font-size="12.5" text-anchor="middle" class="t">S3 SPF/DKIM/DMARC</text>
+<rect x="579.0" y="219.8" width="38" height="70.2" rx="3" fill="#e5534b"/>
+<text x="598.0" y="282.0" font-size="12" font-weight="600" text-anchor="middle" fill="#ffffff">4.8</text>
+<rect x="623.0" y="123.3" width="38" height="166.7" rx="3" fill="#3fb950"/>
+<text x="642.0" y="282.0" font-size="12" font-weight="600" text-anchor="middle" fill="#ffffff">11.4</text>
+<line x1="570.0" x2="670.0" y1="127.7" y2="127.7" stroke="#d29922" stroke-width="3" stroke-dasharray="6 4"/>
+<text x="620.0" y="310" font-size="12.5" text-anchor="middle" class="t">S4 terminal</text>
+<rect x="739.0" y="244.7" width="38" height="45.3" rx="3" fill="#e5534b"/>
+<text x="758.0" y="282.0" font-size="12" font-weight="600" text-anchor="middle" fill="#ffffff">3.1</text>
+<rect x="783.0" y="209.6" width="38" height="80.4" rx="3" fill="#3fb950"/>
+<text x="802.0" y="282.0" font-size="12" font-weight="600" text-anchor="middle" fill="#ffffff">5.5</text>
+<line x1="730.0" x2="830.0" y1="213.9" y2="213.9" stroke="#d29922" stroke-width="3" stroke-dasharray="6 4"/>
+<text x="780.0" y="310" font-size="12.5" text-anchor="middle" class="t">S5 CTA</text>
+<rect x="60" y="328" width="14" height="14" rx="3" fill="#e5534b"/>
+<text x="82" y="340" font-size="13" class="t">hand-timed (25 s total) — 5 errors</text>
+<rect x="351.4" y="328" width="14" height="14" rx="3" fill="#3fb950"/>
+<text x="373.4" y="340" font-size="13" class="t">after readpace fit (50.2 s) — 0 errors</text>
+<line x1="671.2" x2="687.2" y1="335" y2="335" stroke="#d29922" stroke-width="3" stroke-dasharray="6 4"/>
+<text x="693.2" y="340" font-size="13" class="t">reading need (model)</text>
+</svg>

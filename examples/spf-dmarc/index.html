@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1920, height=1080">
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      :root {
+        --bg: #070a10;
+        --panel: #0e1420;
+        --line: #26324a;
+        --text: #e9eef8;
+        --muted: #9aa8c2;
+        --red: #ff5a67;
+        --green: #3ff08f;
+        --amber: #ffc94d;
+        --blue: #6fb6ff;
+        --sans: -apple-system, "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
+        --mono: Menlo, "SF Mono", Monaco, "Courier New", monospace;
+      }
+      html, body { width: 1920px; height: 1080px; overflow: hidden; background: var(--bg); }
+      #root { position: relative; width: 1920px; height: 1080px; background: var(--bg); font-family: var(--sans); color: var(--text); overflow: hidden; }
+      .clip { position: absolute; inset: 0; }
+      .bg-glow { background: radial-gradient(ellipse at 50% 45%, rgba(111,182,255,0.12) 0%, rgba(7,10,16,0) 60%); }
+      .bg-grid { background-image: linear-gradient(rgba(111,182,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(111,182,255,0.05) 1px, transparent 1px); background-size: 80px 80px; }
+      .vignette { background: radial-gradient(ellipse at center, rgba(0,0,0,0) 55%, rgba(0,0,0,0.7) 100%); }
+      .scene { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+
+      /* S1 hook */
+      .hook-q { font-size: 120px; font-weight: 800; letter-spacing: -0.02em; }
+      .hook-a { margin-top: 40px; font-size: 64px; font-weight: 600; color: var(--muted); max-width: 1500px; line-height: 1.2; }
+      .hook-a em { font-style: normal; color: var(--red); }
+
+      /* S2 spoofed mail */
+      .mail { position: relative; width: 1180px; background: var(--panel); border: 2px solid var(--line); border-radius: 22px; text-align: left; padding: 48px 60px; box-shadow: 0 30px 80px rgba(0,0,0,0.5); }
+      .mail-row { font-size: 40px; color: var(--muted); margin-bottom: 18px; font-family: var(--mono); }
+      .mail-row b { color: var(--text); font-weight: 600; }
+      .mail-body { margin-top: 30px; padding-top: 30px; border-top: 2px solid var(--line); font-size: 44px; line-height: 1.35; }
+      .stamp { position: absolute; right: -40px; top: 30px; font-size: 72px; font-weight: 900; color: var(--red); border: 8px solid var(--red); border-radius: 14px; padding: 6px 28px; letter-spacing: 0.06em; transform: rotate(-12deg); background: rgba(7,10,16,0.75); }
+      .caption { margin-top: 56px; font-size: 54px; font-weight: 600; }
+      .caption em { font-style: normal; color: var(--amber); }
+
+      /* S3 three cards */
+      .s3-title { font-size: 76px; font-weight: 800; margin-bottom: 70px; }
+      .cards { display: flex; gap: 48px; }
+      .tcard { width: 500px; height: 420px; background: var(--panel); border: 2px solid var(--line); border-radius: 24px; padding: 48px 44px; text-align: left; }
+      .tcard .tag { font-family: var(--mono); font-size: 70px; font-weight: 700; color: var(--blue); }
+      .tcard .what { margin-top: 26px; font-size: 42px; line-height: 1.3; }
+      .tcard .hint { margin-top: 22px; font-size: 32px; color: var(--muted); line-height: 1.3; }
+
+      /* S4 terminal */
+      .term { width: 1500px; background: #05070b; border: 2px solid var(--line); border-radius: 20px; text-align: left; overflow: hidden; }
+      .term-bar { height: 60px; border-bottom: 2px solid var(--line); display: flex; align-items: center; gap: 14px; padding: 0 26px; }
+      .term-bar i { width: 16px; height: 16px; border-radius: 50%; background: var(--line); display: block; }
+      .term-body { padding: 44px 56px 52px; font-family: var(--mono); font-size: 40px; line-height: 1.6; min-height: 470px; }
+      .t-comment { color: var(--muted); }
+      .t-key { color: var(--blue); }
+      .t-val { color: var(--green); white-space: pre; }
+      .t-ok { margin-top: 36px; color: var(--green); font-weight: 700; font-size: 44px; }
+      .s4-head { font-size: 64px; font-weight: 800; margin-bottom: 50px; }
+      .s4-head em { font-style: normal; color: var(--amber); }
+
+      /* S5 CTA */
+      .cta-big { font-size: 150px; font-weight: 900; letter-spacing: -0.02em; }
+      .cta-big em { font-style: normal; color: var(--green); }
+      .cta-sub { margin-top: 30px; font-size: 64px; font-weight: 600; }
+      .cta-cmd { margin-top: 70px; font-family: var(--mono); font-size: 40px; color: var(--muted); border: 2px solid var(--line); border-radius: 14px; padding: 18px 34px; }
+      .shield { width: 150px; height: 170px; margin-bottom: 40px; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="25" data-width="1920" data-height="1080">
+      <div id="glow" class="clip bg-glow" data-layout-ignore="" data-start="0" data-duration="25" data-track-index="0"></div>
+      <div id="grid" class="clip bg-grid" data-layout-ignore="" data-start="0" data-duration="25" data-track-index="1"></div>
+
+      <div id="vig" class="clip vignette" data-layout-ignore="" data-start="0" data-duration="25" data-track-index="3"></div>
+
+      <!-- S1: Hook -->
+      <div id="s1_a" class="clip scene" data-start="0" data-duration="4.2" data-track-index="2">
+        <div id="hookQ_a" class="hook-q">Own a domain?</div>
+        <div id="hookA_a" class="hook-a">Without SPF &amp; DMARC, <em>anyone</em> can send email in your name.</div>
+      </div>
+
+      <!-- S2: spoofed mail -->
+      <div id="s2_a" class="clip scene" data-start="4.2" data-duration="5" data-track-index="2">
+        <div id="mail_a" class="mail">
+          <div class="mail-row">From: <b>ceo@yourdomain.com</b></div>
+          <div class="mail-row">To: <b>accounts@client.com</b></div>
+          <div class="mail-body">Urgent: please pay the invoice today. New bank details attached.</div>
+          <div id="stamp_a" class="stamp" data-layout-allow-overlap="">SPOOFED</div>
+        </div>
+        <div id="cap2_a" class="caption">Phishing, fraud, reputation damage — <em>under your name.</em></div>
+      </div>
+
+      <!-- S3: SPF / DKIM / DMARC -->
+      <div id="s3_a" class="clip scene" data-start="9.2" data-duration="6.3" data-track-index="2">
+        <div id="s3t_a" class="s3-title">Three DNS records protect you</div>
+        <div class="cards">
+          <div id="c1_a" class="tcard"><div class="tag">SPF</div><div class="what">Which servers may send for you?</div><div class="hint">Everyone else is rejected.</div></div>
+          <div id="c2_a" class="tcard"><div class="tag">DKIM</div><div class="what">A digital signature on every mail.</div><div class="hint">Proves the mail is genuine.</div></div>
+          <div id="c3_a" class="tcard"><div class="tag">DMARC</div><div class="what">What happens to forgeries?</div><div class="hint">Reject instead of deliver.</div></div>
+        </div>
+      </div>
+
+      <!-- S4: Terminal -->
+      <div id="s4_a" class="clip scene" data-start="15.5" data-duration="5.3" data-track-index="2">
+        <div id="s4h_a" class="s4-head">Domain that never sends mail? <em>Two lines are enough.</em></div>
+        <div id="term_a" class="term">
+          <div class="term-bar"><i></i><i></i><i></i></div>
+          <div class="term-body">
+            <div class="t-comment"># DNS records (TXT)</div>
+            <div><span class="t-key">yourdomain.com&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span id="v1_a" class="t-val"></span></div>
+            <div><span class="t-key">_dmarc.yourdomain.com&nbsp;</span><span id="v2_a" class="t-val"></span></div>
+            <div id="ok_a" class="t-ok">✓ Forgeries get rejected</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- S5: CTA -->
+      <div id="s5_a" class="clip scene" data-start="20.8" data-duration="4.2" data-track-index="2">
+        <svg id="shield_a" class="shield" viewBox="0 0 150 170" fill="none">
+          <path d="M75 6 L140 30 V82 C140 122 112 150 75 164 C38 150 10 122 10 82 V30 Z" stroke="#3ff08f" stroke-width="8" stroke-linejoin="round" fill="rgba(63,240,143,0.08)"/>
+          <path id="check_a" d="M45 86 L67 108 L107 64" stroke="#3ff08f" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div id="ctaBig_a" class="cta-big"><em>15 minutes</em> in DNS.</div>
+        <div id="ctaSub_a" class="cta-sub">Check your domain — today.</div>
+        <div id="ctaCmd_a" class="cta-cmd">$ dig TXT _dmarc.yourdomain.com</div>
+      </div>
+
+    </div>
+
+    <script>
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+
+      const V1 = '"v=spf1 -all"';
+      const V2 = '"v=DMARC1; p=reject;"';
+
+      // Scene convention (docs/scene-convention.md): entrances relative to the scene
+      // start S, the exit relative to the scene end E. Start and duration live only in
+      // the scene's data-start / data-duration — `readpace fit` rewrites them, this
+      // code never changes.
+      function win(id) {
+        const el = document.getElementById(id);
+        const S = parseFloat(el.dataset.start);
+        return { S, E: S + parseFloat(el.dataset.duration) };
+      }
+      const OUT = 0.45;  // the exit starts this long before the scene ends
+
+      // Slides S1–S5; p = pass suffix, so a pass can be mounted twice
+      function slides(p) {
+        const $ = (id) => "#" + id + "_" + p;
+        const ty = { a: 0, b: 0 };
+        const setTy = () => {
+          document.getElementById("v1_" + p).textContent = V1.slice(0, Math.round(ty.a));
+          document.getElementById("v2_" + p).textContent = V2.slice(0, Math.round(ty.b));
+        };
+        gsap.set([$("hookQ"), $("hookA")], { opacity: 0, y: 40 });
+        gsap.set($("mail"), { opacity: 0, y: 60, scale: 0.96 });
+        gsap.set($("stamp"), { opacity: 0, scale: 2.6 });
+        gsap.set($("cap2"), { opacity: 0, y: 24 });
+        gsap.set($("s3t"), { opacity: 0, y: 30 });
+        gsap.set([$("c1"), $("c2"), $("c3")], { opacity: 0, y: 70 });
+        gsap.set([$("s4h"), $("term")], { opacity: 0, y: 30 });
+        gsap.set($("ok"), { opacity: 0, x: -20 });
+        gsap.set([$("ctaBig"), $("ctaSub"), $("ctaCmd")], { opacity: 0, y: 30 });
+        gsap.set($("shield"), { opacity: 0, scale: 0.6 });
+        gsap.set($("check"), { strokeDasharray: 110, strokeDashoffset: 110 });
+
+        let w = win("s1_" + p);
+        tl.to($("hookQ"), { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }, w.S + 0.2);
+        tl.to($("hookA"), { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }, w.S + 1.3);
+        tl.to($("hookA") + " em", { textShadow: "0 0 30px rgba(255,90,103,0.9)", duration: 0.4, yoyo: true, repeat: 1 }, w.S + 2.1);
+        tl.to([$("hookQ"), $("hookA")], { opacity: 0, y: -30, duration: 0.4, ease: "power2.in" }, w.E - OUT);
+
+        w = win("s2_" + p);
+        tl.to($("mail"), { opacity: 1, y: 0, scale: 1, duration: 0.6, ease: "power3.out" }, w.S + 0.15);
+        tl.to($("stamp"), { opacity: 1, scale: 1, duration: 0.3, ease: "power4.in" }, w.S + 1.7);
+        tl.to($("mail"), { x: 12, duration: 0.05, yoyo: true, repeat: 5, ease: "none" }, w.S + 2.0);
+        tl.to($("mail"), { x: 0, duration: 0.02 }, w.S + 2.3);
+        tl.to($("cap2"), { opacity: 1, y: 0, duration: 0.5, ease: "power2.out" }, w.S + 2.5);
+        tl.to([$("mail"), $("cap2")], { opacity: 0, y: -30, duration: 0.4, ease: "power2.in" }, w.E - OUT);
+
+        w = win("s3_" + p);
+        tl.to($("s3t"), { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, w.S + 0.15);
+        tl.to($("c1"), { opacity: 1, y: 0, duration: 0.55, ease: "back.out(1.6)" }, w.S + 0.8);
+        tl.to($("c2"), { opacity: 1, y: 0, duration: 0.55, ease: "back.out(1.6)" }, w.S + 2.0);
+        tl.to($("c3"), { opacity: 1, y: 0, duration: 0.55, ease: "back.out(1.6)" }, w.S + 3.2);
+        tl.to($("c3"), { borderColor: "#3ff08f", boxShadow: "0 0 50px rgba(63,240,143,0.35)", duration: 0.5 }, w.S + 4.2);
+        tl.to([$("s3t"), $("c1"), $("c2"), $("c3")], { opacity: 0, y: -30, duration: 0.4, ease: "power2.in" }, w.E - OUT);
+
+        w = win("s4_" + p);
+        tl.to($("s4h"), { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, w.S + 0.1);
+        tl.to($("term"), { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, w.S + 0.3);
+        tl.to(ty, { a: V1.length, duration: 0.9, ease: "none", onUpdate: setTy }, w.S + 0.9);
+        tl.to(ty, { b: V2.length, duration: 1.3, ease: "none", onUpdate: setTy }, w.S + 2.0);
+        tl.to($("ok"), { opacity: 1, x: 0, duration: 0.4, ease: "power2.out" }, w.S + 3.5);
+        tl.to([$("s4h"), $("term")], { opacity: 0, y: -30, duration: 0.4, ease: "power2.in" }, w.E - OUT);
+
+        w = win("s5_" + p);
+        tl.to($("shield"), { opacity: 1, scale: 1, duration: 0.5, ease: "back.out(2)" }, w.S + 0.1);
+        tl.to($("check"), { strokeDashoffset: 0, duration: 0.5, ease: "power2.out" }, w.S + 0.5);
+        tl.to($("ctaBig"), { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, w.S + 0.7);
+        tl.to($("ctaSub"), { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, w.S + 1.3);
+        tl.to($("ctaCmd"), { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, w.S + 1.9);
+        tl.to([$("shield"), $("ctaBig"), $("ctaSub"), $("ctaCmd")], { opacity: 0, y: -30, duration: 0.4, ease: "power2.in" }, w.E - OUT);
+      }
+
+      slides("a");
+
+      window.__timelines["main"] = tl;
+      tl.seek(0);
+    </script>
+  </body>
+</html>

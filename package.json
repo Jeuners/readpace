@@ -1,0 +1,50 @@
+{
+  "name": "readpace",
+  "version": "0.1.0",
+  "description": "Measured slide timing for HyperFrames compositions: checks that every slide stays readable long enough, re-times scenes from reading demand, and calibrates against real readers.",
+  "type": "module",
+  "bin": {
+    "readpace": "bin/readpace.js"
+  },
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "docs",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "example:check": "node bin/readpace.js check examples/spf-dmarc",
+    "example:fit": "node bin/readpace.js fit examples/spf-dmarc"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "puppeteer-core": "^24.0.0"
+  },
+  "keywords": [
+    "hyperframes",
+    "video",
+    "motion-graphics",
+    "gsap",
+    "slides",
+    "reading-time",
+    "timing",
+    "accessibility"
+  ],
+  "author": "Jeuners",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Jeuners/readpace.git"
+  },
+  "homepage": "https://github.com/Jeuners/readpace#readme",
+  "bugs": {
+    "url": "https://github.com/Jeuners/readpace/issues"
+  }
+}

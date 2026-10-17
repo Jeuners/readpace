@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [20, 22]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - name: Install headless Chrome
+        run: |
+          npx --yes @puppeteer/browsers install chrome-headless-shell@stable --path "$HOME/.cache/puppeteer"
+          sudo apt-get update && sudo apt-get install -y libnss3 libatk-bridge2.0-0 libgbm1 libasound2t64 || true
+      - run: npm test
+      - name: Example — hand-timed composition must fail the check
+        run: |
+          if node bin/readpace.js check examples/spf-dmarc; then
+            echo "expected errors"; exit 1
+          fi
