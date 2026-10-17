@@ -47,9 +47,16 @@ test("a trailing hold scene absorbs the shift; the total stays fixed", () => {
   assert.deepEqual(p.total, { from: 20, to: 20 });
 });
 
+const layerClips = [
+  { id: "bg", start: 0, duration: 20, hasText: false }, { id: "music", start: 0, duration: 20, hasText: false },
+  { id: "s1", start: 0, duration: 5, hasText: true }, { id: "s2", start: 5, duration: 5, hasText: true },
+  { id: "s3", start: 10, duration: 10, hasText: true },
+];
+
 test("apply rewrites scenes, the root and full-length layers", () => {
   const h = html();
-  const p = plan(h, analysis(scene("s1", { overrun: 2 }), scene("s2"), scene("s3")), DEFAULTS);
+  const p = plan(h, analysis(scene("s1", { overrun: 2 }), scene("s2"), scene("s3")), DEFAULTS, undefined, layerClips);
+  assert.deepEqual(p.layers, ["bg", "music"]);
   const out = apply(h, p);
   assert.equal(compositionDuration(out), 22.3);
   assert.match(out, /id="bg" class="clip" data-start="0" data-duration="22.3"/);
@@ -84,12 +91,11 @@ test("full-length layers are not scenes; overlapping clips are rejected", () => 
     <div id="s1" data-start="0" data-duration="5"></div>
     <div id="cap" data-start="3" data-duration="4"></div>
     <div id="s2" data-start="5" data-duration="5"></div></div>`;
-  const clips = [clip("logo", 0, 10), clip("s1", 0, 5), clip("cap", 3, 4), clip("s2", 5, 5)];
-  assert.throws(() => plan(h, analysis(scene("logo", { idle: 8 }), scene("s1"), scene("s2")), DEFAULTS, undefined, clips),
-    /overlap/);
-  const ok = plan(h, analysis(scene("logo", { idle: 8 }), scene("s1"), scene("s2")), DEFAULTS, undefined,
-    clips.filter((c) => c.id !== "cap"));
+  const clips = [clip("logo", 0, 10, { hasText: false }), clip("s1", 0, 5), clip("cap", 3, 4), clip("s2", 5, 5)];
+  assert.throws(() => plan(h, analysis(scene("s1"), scene("s2")), DEFAULTS, undefined, clips), /overlap/);
+  const ok = plan(h, analysis(scene("s1"), scene("s2")), DEFAULTS, undefined, clips.filter((c) => c.id !== "cap"));
   assert.deepEqual(ok.scenes.map((x) => x.scene), ["s1", "s2"]);
+  assert.deepEqual(ok.layers, ["logo"]);
 });
 
 test("a hold scene that would turn negative is an error, not a negative duration", () => {
@@ -113,8 +119,35 @@ test("full-length layers are matched numerically and with either quote style", (
     <div id="bg" data-start='0' data-duration="10.0"></div>
     <div id="s1" data-start="0" data-duration="5"></div>
     <div id="s2" data-start="5" data-duration="5"></div></div>`;
-  const out = apply(h, plan(h, analysis(scene("s1", { overrun: 1 }), scene("s2")), DEFAULTS));
+  const out = apply(h, plan(h, analysis(scene("s1", { overrun: 1 }), scene("s2")), DEFAULTS, undefined,
+    [clip("bg", 0, 10, { hasText: false }), clip("s1", 0, 5), clip("s2", 5, 5)]));
   assert.match(out, /id="bg" data-start='0' data-duration="11.3"/);
   assert.equal(compositionDuration(out), 11.3);
+});
+
+test("a single full-length scene with text is a scene, not a layer", () => {
+  const h = `<div data-composition-id="m" data-start="0" data-duration="5"><div id="s1" data-start="0" data-duration="5"></div></div>`;
+  const p = plan(h, analysis(scene("s1", { overrun: 1 })), DEFAULTS, undefined, [clip("s1", 0, 5)]);
+  assert.equal(p.scenes[0].newDur, 6.3);
+  assert.equal(p.total.to, 6.3);
+});
+
+test("only the first data-composition-id is the root; sub-compositions stop fit", () => {
+  const h = `<div data-composition-id="m" data-start="0" data-duration="10">
+    <div id="intro" data-composition-id="intro" data-start="0" data-duration="5"></div>
+    <div id="s2" data-start="5" data-duration="5"></div></div>`;
+  assert.equal(compositionDuration(h), 10);
+  const withSrc = h.replace('data-composition-id="intro"', 'data-composition-id="intro" data-composition-src="c/intro.html"');
+  assert.throws(() => plan(withSrc, analysis(scene("s2")), DEFAULTS), /sub-compositions/);
+});
+
+test("attributes may be unquoted or spaced; non-numeric values are rejected", () => {
+  const h = `<div data-composition-id=m data-start = "0" data-duration=8><div id=s1 data-start= '0' data-duration = 8></div></div>`;
+  assert.equal(compositionDuration(h), 8);
+  const t = sceneTag(h, "s1");
+  assert.equal(t.dur, 8);
+  const out = apply(h, plan(h, analysis(scene("s1", { overrun: 1 })), DEFAULTS, undefined, [clip("s1", 0, 8)]));
+  assert.match(out, /id=s1 data-start="0" data-duration="9.3"/);
+  assert.throws(() => sceneTag(h.replace("data-duration = 8", 'data-duration="4s"'), "s1"), /plain number/);
 });
 

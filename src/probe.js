@@ -70,19 +70,35 @@ function sampleTimeline(STEP) {
     }
     return parts.join(" > ");
   };
-  // block element -> its own text (text nodes whose nearest non-inline ancestor
-  // is that block; text of nested blocks is not counted twice)
+  const SKIP = new Set(["SCRIPT", "STYLE", "SVG", "svg", "TEMPLATE"]);
+  // A block's own text in document order: inline descendants (incl. inline-block,
+  // e.g. per-character SplitText spans) are joined without extra spaces; <br> and
+  // nested blocks act as word boundaries, nested blocks' text is not included.
+  const ownText = (block) => {
+    let out = "";
+    const walk = (node) => {
+      for (const c of node.childNodes) {
+        if (c.nodeType === Node.TEXT_NODE) out += c.nodeValue;
+        else if (c.nodeType !== Node.ELEMENT_NODE || SKIP.has(c.tagName)) continue;
+        else if (c.tagName === "BR" || !isInline(c)) out += " ";
+        else walk(c);
+      }
+    };
+    walk(block);
+    return out;
+  };
+  // block element -> its own text
   const blocks = () => {
-    const map = new Map();
+    const set = new Set();
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
     for (let n = walker.nextNode(); n; n = walker.nextNode()) {
       if (!n.nodeValue.trim()) continue;
       let el = n.parentElement;
-      if (!el || el.closest("script,style,svg")) continue;
+      if (!el || el.closest("script,style,svg,template")) continue;
       while (el !== root && isInline(el)) el = el.parentElement;
-      map.set(el, (map.get(el) || "") + " " + n.nodeValue);
+      set.add(el);
     }
-    return map;
+    return new Map([...set].map((el) => [el, ownText(el)]));
   };
   const opacityChain = (el) => {
     let o = 1;
@@ -131,8 +147,11 @@ function sampleTimeline(STEP) {
       (samples[key] ||= []).push([t, visible ? 1 : 0, text.length]);
     }
   }
-  // top-level clips (direct children of the root), used by fit to lay out scenes
-  const clips = [...root.children].filter((c) => c.hasAttribute("data-start")).map((c) => ({
+  // outermost clips under the root (the "scenes" check groups by), used by fit
+  const clips = [...root.querySelectorAll("[data-start]")].filter((c) => {
+    for (let e = c.parentElement; e && e !== root; e = e.parentElement) if (e.hasAttribute("data-start")) return false;
+    return true;
+  }).map((c) => ({
     id: c.id || null,
     start: +c.dataset.start,
     duration: +c.dataset.duration,

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { addRecords, ageDays, loadSummary, summarize } from "../src/calibration.js";
+import { addRecords, ageDays, isStale, loadSummary, summarize } from "../src/calibration.js";
 import { calibrationPlan, toRecords } from "../src/calibrate-server.js";
 
 const rec = (measured, predicted, factor = 1) => ({
@@ -68,3 +68,24 @@ test("repeat scenes are solved against the unfactored model", () => {
   const [rec] = toRecords(plan, [{ scene: "r", measured: 1.2 }]);
   assert.ok(Math.abs(rec.fScene - 0.6) < 0.01);  // unfactored cost 2 → 1.2 s is 0.6
 });
+
+test("scenes whose text never fully coexists are skipped, not mis-measured", () => {
+  const p = calibrationPlan({ scenes: [{ scene: "s", start: 0, timing: null, factor: 1, firstReady: 0.5, readTime: 3,
+    orient: 0.4, blocks: [{ start: 0.5, end: 1.6, cost: 1 }, { start: 2, end: 6, cost: 1 }] }] });
+  assert.deepEqual(p.skipped, ["s"]);
+  assert.equal(p.scenes.length, 0);
+});
+
+test("implausible measurements are dropped, records keep the reading rates", () => {
+  const plan = { model: { wps: 3 }, scenes: [{ scene: "s", factor: 1, readTime: 2, orient: 0, blocks: [{ start: 0, cost: 2 }] }] };
+  const recs = toRecords(plan, [{ scene: "s", measured: 0.01 }, { scene: "s", measured: 500 }, { scene: "s", measured: 3 }]);
+  assert.equal(recs.length, 1);
+  assert.deepEqual(recs.rejected, ["s", "s"]);
+  assert.deepEqual(recs[0].model, { wps: 3 });
+});
+
+test("stale calibrations are detected", () => {
+  assert.equal(isStale({ updated: "2026-01-01" }, new Date("2026-06-01")), true);
+  assert.equal(isStale({ updated: "2026-05-01" }, new Date("2026-06-01")), false);
+});
+

@@ -13,7 +13,7 @@ The composition's `index.html` is opened from disk in headless Chromium at 1920�
 - its bounding box intersects the frame, and
 - its text has reached its maximum observed length (typewriter effects count only once complete).
 
-A block's text is its **own** text: text nodes whose nearest non-inline ancestor is the block. Text of nested blocks is counted once, in the nested block.
+A block's text is its **own** text, in document order: inline descendants (including `inline-block`, e.g. per-character SplitText spans) are joined without extra spaces, while `<br>` and nested blocks act as word boundaries. Text of nested blocks is counted once, in the nested block.
 
 The probe returns, per block, its metadata (scene, font size, monospace or not, reading factor, timing mode, full text) and a list of `[t, readable, textLength]` samples, plus the top-level clips of the root and the number of sub-compositions (which are reported as not measured).
 
@@ -40,16 +40,16 @@ Two passes over the same blocks give two different measures:
 
 ## 4. Fit (`src/fit.js`)
 
-`fit` works on the root's **top-level clips**. Clips that span the whole composition (`data-start` 0, `data-duration` equal to the total) are layers and stay put; every other top-level clip must follow the previous one — overlapping clips stop `fit` with an error.
+`fit` works on the **outermost clips** under the root — the same units `check` calls scenes (a wrapper element without `data-start` is fine). Full-length clips *without text of their own* (`data-start` 0, `data-duration` equal to the total: backgrounds, music) are layers; they need an `id` so they can be resized with the composition. Every other outermost clip must follow the previous one — overlapping clips stop `fit` with an error. Compositions with sub-compositions (`data-composition-src`) are rejected for now.
 
 For every scene: `new duration = duration + overrun + 0.3 s` if it lacks time, or `duration − (idle − 0.8 s)` if it idles for more than 2.5 s. Durations are rounded to 0.1 s, minimum 1.5 s. Clips without text keep their duration but move with the rest. Scenes are then laid out in their original order, keeping the gaps between them.
 
 The total length:
 
 - with a trailing `data-timing="hold"` scene, that scene keeps its end and absorbs the shift, so the total stays fixed (a music track, a fixed slot). If it would shrink below 1.5 s, `fit` stops with an error instead;
-- otherwise the root `data-duration` changes, and so does every layer that spanned the whole composition (`data-start="0"` and `data-duration` equal to the old total: backgrounds, music).
+- otherwise the root `data-duration` (the first element with `data-composition-id`) changes, and so do the layers.
 
-The HTML is changed only in those attributes; comments, scripts and styles are ignored when looking them up. readpace re-probes a scratch copy next to `index.html` with the new timing and repeats until nothing changes (at most three rounds, `--rounds`). The original file is written only with `--write`.
+The HTML is changed only in those attributes; comments, scripts and styles are ignored when looking them up, attributes may be quoted, single-quoted or unquoted, and non-numeric values (`"4s"`) are rejected. readpace re-probes a scratch copy next to `index.html` with the new timing and repeats until nothing changes (at most three rounds, `--rounds`); if it stops before that, it says so. The original file is written only with `--write`, and an existing backup is never overwritten (`index.html.bak`, `.bak2`, …).
 
 ## 5. Calibration
 

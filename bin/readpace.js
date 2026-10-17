@@ -7,7 +7,7 @@ import { exec } from "node:child_process";
 import { DEFAULTS, analyse } from "../src/model.js";
 import { probe } from "../src/probe.js";
 import { apply, changed, plan } from "../src/fit.js";
-import { calibrationPath, loadSummary } from "../src/calibration.js";
+import { calibrationPath, isStale, loadSummary, modelMismatch } from "../src/calibration.js";
 import { calibrationPlan, serveCalibration } from "../src/calibrate-server.js";
 import { calibrationLine, formatCheck, formatPlan } from "../src/report.js";
 
@@ -87,6 +87,7 @@ function resolveIndex(t) {
   return index;
 }
 
+/** Reading model for this run; a stale calibration is shown but not applied. */
 function config({ calibrated = true } = {}) {
   const summary = calibrated && !opt["no-calibration"] ? loadSummary() : null;
   const cfg = {
@@ -94,17 +95,28 @@ function config({ calibrated = true } = {}) {
     wps: positive("wps", DEFAULTS.wps),
     wpsHead: positive("wps-head", DEFAULTS.wpsHead),
     cpsMono: positive("cps-mono", DEFAULTS.cpsMono),
-    ...(summary && { k: summary.k }),
   };
-  return { cfg, summary };
+  const applied = !!summary && !isStale(summary);
+  if (applied) cfg.k = summary.k;
+  const mismatch = applied ? modelMismatch(summary, cfg) : null;
+  const notes = mismatch
+    ? [`WARNING  calibration was measured with different reading rates (${mismatch.join(", ")}); k may not fit`]
+    : [];
+  return { cfg, summary, applied, notes };
 }
 
 const step = positive("step", 0.1);
 
 async function check() {
-  const { cfg, summary } = config();
+  const { cfg, summary, applied, notes } = config();
   const result = analyse(await probe(resolveIndex(target), { step }), cfg);
-  console.log(opt.json ? JSON.stringify(result, null, 2) : formatCheck(result, summary));
+  if (opt.json) {
+    result.calibration = { summary, applied, stale: summary ? isStale(summary) : false, notes };
+    console.log(JSON.stringify(result, null, 2));
+  } else {
+    console.log(formatCheck(result, summary));
+    notes.forEach((n) => console.log(n));
+  }
   const errors = result.findings.filter((f) => f.level === "error").length;
   const warnings = result.findings.filter((f) => f.level === "warning").length;
   return errors || (opt.strict && warnings) ? 1 : 0;
@@ -112,8 +124,9 @@ async function check() {
 
 async function fit() {
   const index = resolveIndex(target);
-  const { cfg, summary } = config();
+  const { cfg, summary, notes } = config();
   console.log(calibrationLine(summary));
+  notes.forEach((n) => console.log(n));
   const original = fs.readFileSync(index, "utf8");
   // re-measure a scratch copy next to the original (so relative assets resolve);
   // index.html itself is only touched by --write
@@ -121,19 +134,28 @@ async function fit() {
   const cleanup = () => fs.rmSync(scratch, { force: true });
   process.once("SIGINT", () => { cleanup(); process.exit(130); });
   let html = original;
+  let converged = false;
+  const rounds = positive("rounds", 3);
   try {
-    for (let round = 1; round <= positive("rounds", 3); round++) {
+    for (let round = 1; round <= rounds; round++) {
       fs.writeFileSync(scratch, html);
       const measured = await probe(scratch, { step });
       const p = plan(html, analyse(measured, cfg), cfg, undefined, measured.clips);
       if (round === 1) p.warnings.forEach((w) => console.log(`WARNING  ${w}`));
       const diff = changed(p);
       console.log(formatPlan(round, diff, p.total));
-      if (!diff.length) break;
+      if (!diff.length) {
+        converged = true;
+        break;
+      }
       html = apply(html, p);
     }
   } finally {
     cleanup();
+  }
+  if (!converged) {
+    console.log(`\nWARNING  not converged after ${rounds} round(s): the last changes were not re-measured. ` +
+      "Run fit again, or raise --rounds.");
   }
   if (!opt.write) {
     console.log("\nDry run — use --write to apply.");
@@ -143,21 +165,27 @@ async function fit() {
     console.log("\nNothing to change.");
     return 0;
   }
-  fs.writeFileSync(index + ".bak", original);
+  let backup = index + ".bak";
+  for (let i = 2; fs.existsSync(backup); i++) backup = `${index}.bak${i}`; // never overwrite an older backup
+  fs.writeFileSync(backup, original);
   fs.writeFileSync(index, html);
-  console.log(`\nwritten: ${index} (backup: ${path.basename(index)}.bak)`);
+  console.log(`\nwritten: ${index} (backup: ${path.basename(backup)})`);
   return 0;
 }
 
 async function calibrate() {
   const index = resolveIndex(target);
   const { cfg } = config({ calibrated: false }); // compare against the raw model
-  const p = calibrationPlan(analyse(await probe(index, { step }), cfg), step);
+  const model = { wps: cfg.wps, wpsHead: cfg.wpsHead, cpsMono: cfg.cpsMono };
+  const p = calibrationPlan(analyse(await probe(index, { step }), cfg), step, model);
+  for (const s of p.skipped) {
+    console.log(`skipped ${s}: a block leaves before the last one appears, so the scene cannot be held with all text visible`);
+  }
   if (!p.scenes.length) {
     console.error("no scenes to calibrate");
     return 2;
   }
-  const { summary } = await serveCalibration({
+  const { summary, rejected } = await serveCalibration({
     projectDir: path.dirname(index),
     plan: p,
     project: path.basename(path.dirname(index)),
@@ -171,6 +199,7 @@ async function calibrate() {
       }
     },
   });
+  if (rejected.length) console.log(`\ndropped ${rejected.length} implausible measurement(s): ${rejected.join(", ")}`);
   console.log(`\nsaved → ${calibrationPath()}`);
   printCalibration(summary);
   return 0;

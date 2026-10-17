@@ -110,9 +110,9 @@ Each slide plays in real time and **holds just before its first block starts to 
 | `k` | median over first viewings of the per-scene scale at which the simulated read time equals the measured one; multiplies every reading cost |
 | `iqr` | spread of *k* (25th–75th percentile) — reported, never rounded away |
 | `kRepeat` | measured factor for repeated scenes, a suggestion for `data-reading-factor` |
-| `n`, `updated` | sample size and age; `check` flags calibrations older than 90 days as stale |
+| `n`, `updated` | sample size and age; a calibration older than 90 days is shown as stale and **not applied** |
 
-Every individual measurement is kept, so *k* can be recomputed or segmented later. More: [docs/calibration.md](docs/calibration.md).
+Every individual measurement is kept, together with the reading rates it was measured against, so *k* can be recomputed or segmented later. Measurements the model cannot explain (a key pressed by accident, a window left open) are dropped and reported. More: [docs/calibration.md](docs/calibration.md).
 
 ## Programmatic use
 
@@ -126,8 +126,9 @@ for (const s of result.scenes) console.log(s.scene, s.need, s.available, s.overr
 ## Limitations
 
 - Only text is scored. Images, icons and charts have no reading cost yet.
-- **Single-file compositions only.** Sub-compositions (`data-composition-src`) are not loaded into the probe yet; `check` warns when it finds them. HyperFrames recommends building the root from sub-compositions, so projects structured that way are not measured yet. The bundled example therefore triggers 6 `hyperframes lint` warnings (5× `nested_structure_needs_subcomposition`, 1× `timeline_track_too_dense`; 0 errors, `hyperframes check` passes). Sub-composition support is the top roadmap item.
-- `fit` lays out top-level clips in sequence. Clips that span the whole composition are treated as layers; other parallel clips (overlays, captions) make `fit` stop with an error. `check` handles them.
+- **Single-file compositions only.** Sub-compositions (`data-composition-src`) are not loaded into the probe yet; `check` warns when it finds them. HyperFrames recommends building the root from sub-compositions, so projects structured that way are not measured yet. The bundled example therefore triggers 6 `hyperframes lint` warnings with hyperframes 0.8.151 (5× `nested_structure_needs_subcomposition`, 1× `timeline_track_too_dense`; 0 errors, `hyperframes check` passes). Sub-composition support is the top roadmap item.
+- `fit` lays out the outermost clips in sequence. Full-length clips without text (backgrounds, music) are treated as layers; other parallel clips (overlays, captions) make `fit` stop with an error. `check` handles them.
+- `fit` measures a scratch copy (`.readpace-probe-<pid>.html`) next to `index.html`, so relative assets resolve. A dev server watching the folder may notice it briefly.
 - The model assumes the viewer reads everything. Purely decorative text can produce false deficits.
 - Narration is ignored; with a voice-over, speech sets the pace, not the text.
 - Default reading rates were chosen for German/English body text on screen and are uncalibrated estimates. Calibrate for your audience.
@@ -144,7 +145,7 @@ No code is shared. The paper is about LLM agent systems, not video; readpace tra
 |---|---|
 | In a randomised-role delegation experiment (n = 200), agents given measured per-action latencies of their peers chose the cost-favoured delegate in 100/100 trials vs 55/100 without; the control arm was indistinguishable from chance (p = 0.37). A run without randomised roles did not replicate — measured timing mattered where it could not be inferred from static framing. | Readable time is measured from the actual animation, not inferred from the durations someone typed in |
 | Agent proper time as a monotonic count of weighted internal operations, kept separate from an instantaneous pace estimate (§4.2–4.3) | Reading need as weighted reading units (words, code characters, blocks), kept separate from the reading rate (words/s × *k*) |
-| "A stale rate estimate is worse than no estimate" (§4.3); the follow-up implementation makes unknown or stale estimates explicit ([IMPLEMENTATION.md](https://github.com/Jeuners/Time_Dilation_in_LLM_Agent_Systems/blob/main/IMPLEMENTATION.md)) | *k* is reported with IQR, sample size and age; uncalibrated output says so; calibrations older than 90 days are flagged |
+| "a stale rate estimate is worse than no estimate" (§4.3); the follow-up implementation makes unknown or stale estimates explicit ([IMPLEMENTATION.md](https://github.com/Jeuners/Time_Dilation_in_LLM_Agent_Systems/blob/main/IMPLEMENTATION.md)) | *k* is reported with IQR, sample size and age; uncalibrated output says so; a calibration older than 90 days is not applied |
 
 ## Development
 

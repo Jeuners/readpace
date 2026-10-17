@@ -24,9 +24,15 @@ function mask(html) {
     (m) => m.replace(/[^\n]/g, " "));
 }
 
+const attrRe = (name) => new RegExp(`(\\s${name}\\s*=\\s*)(?:"([^"]*)"|'([^']*)'|([^\\s"'>]+))`);
 const attr = (tag, name) => {
-  const m = tag.match(new RegExp(`(?:^|\\s)${name}=(["'])([^"']*)\\1`));
-  return m ? m[2] : null;
+  const m = tag.match(attrRe(name));
+  return m ? (m[2] ?? m[3] ?? m[4]) : null;
+};
+const finite = (v, what) => {
+  const n = Number(String(v).trim());
+  if (!Number.isFinite(n)) throw new Error(`${what} must be a plain number of seconds, got "${v}"`);
+  return n;
 };
 
 function* tags(html) {
@@ -36,24 +42,27 @@ function* tags(html) {
 }
 
 export function sceneTag(html, id) {
-  const masked = mask(html);
-  const m = new RegExp(`<[a-zA-Z][^>]*\\sid=(["'])${esc(id)}\\1[^>]*>`).exec(masked);
-  if (!m) throw new Error(`scene "${id}" not found in HTML`);
-  const tag = html.slice(m.index, m.index + m[0].length);
-  const start = attr(tag, "data-start");
-  const dur = attr(tag, "data-duration");
-  if (start === null || dur === null) throw new Error(`scene "${id}" lacks data-start/data-duration`);
-  return { index: m.index, tag, start: +start, dur: +dur };
+  for (const { index, tag } of tags(html)) {
+    if (attr(tag, "id") !== id) continue;
+    const start = attr(tag, "data-start");
+    const dur = attr(tag, "data-duration");
+    if (start === null || dur === null) throw new Error(`scene "${id}" lacks data-start/data-duration`);
+    return { index, tag, start: finite(start, `data-start of "${id}"`), dur: finite(dur, `data-duration of "${id}"`) };
+  }
+  throw new Error(`scene "${id}" not found in HTML`);
+}
+
+/** The root composition is the first element with data-composition-id. */
+function rootTag(html) {
+  for (const t of tags(html)) if (attr(t.tag, "data-composition-id") !== null) return t;
+  throw new Error("no element with data-composition-id found");
 }
 
 export function compositionDuration(html) {
-  for (const { tag } of tags(html)) {
-    if (attr(tag, "data-composition-id") === null) continue;
-    const d = attr(tag, "data-duration");
-    if (d === null || !(+d > 0)) throw new Error("the root composition needs a positive data-duration");
-    return +d;
-  }
-  throw new Error("no element with data-composition-id found");
+  const d = attr(rootTag(html).tag, "data-duration");
+  const n = d === null ? NaN : finite(d, "root data-duration");
+  if (!(n > 0)) throw new Error("the root composition needs a positive data-duration");
+  return n;
 }
 
 /**
@@ -76,13 +85,23 @@ export function plan(html, analysis, cfg, opts = FIT_DEFAULTS, clips = null) {
   const from = compositionDuration(html);
   const byScene = new Map(analysis.scenes.map((s) => [s.scene, s]));
   const warnings = [];
+  if (/\sdata-composition-src\s*=/.test(mask(html))) {
+    throw new Error("fit does not support sub-compositions (data-composition-src) yet; check still works");
+  }
 
-  const list = (clips ?? analysis.scenes.map((s) => ({ id: s.scene }))).filter((c) => {
-    const isLayer = c.start !== undefined && Math.abs(c.start) < EPS && Math.abs(c.duration - from) < EPS;
-    return !isLayer;
+  // a full-length clip without text of its own is a layer (background, music), not a scene
+  const layers = [];
+  const list = (clips ?? analysis.scenes.map((s) => ({ id: s.scene, hasText: true }))).filter((c) => {
+    const full = c.start !== undefined && Math.abs(c.start) < EPS && Math.abs(c.duration - from) < EPS;
+    if (full && !c.hasText) {
+      if (!c.id) throw new Error("give full-length layers an id so fit can resize them with the composition");
+      layers.push(c.id);
+      return false;
+    }
+    return true;
   });
   for (const s of analysis.scenes) {
-    if (!list.some((c) => c.id === s.scene)) warnings.push(`text outside a top-level scene is not re-timed: ${s.scene}`);
+    if (!list.some((c) => c.id === s.scene)) warnings.push(`text outside any clip is not re-timed: ${s.scene}`);
   }
 
   const rows = list.map((c) => {
@@ -118,23 +137,22 @@ export function plan(html, analysis, cfg, opts = FIT_DEFAULTS, clips = null) {
     }
     shift = x.newStart + x.newDur - (x.start + x.dur);
   });
-  return { scenes: rows, total: { from, to: round2(from + shift) }, warnings };
+  return { scenes: rows, layers, total: { from, to: round2(from + shift) }, warnings };
 }
 
 function setAttr(tag, name, value) {
-  return tag.replace(new RegExp(`(\\s${name}=)(["'])[^"']*\\2`), `$1$2${value}$2`);
+  return tag.replace(attrRe(name), (_, lead) => `${lead.replace(/\s*=\s*$/, "=")}"${value}"`);
 }
 
-/** Rewrite scene timing and, if the total changed, the root and full-length layers. */
-export function apply(html, { scenes: rows, total }) {
+/** Rewrite scene timing and, if the total changed, the root and the full-length layers. */
+export function apply(html, { scenes: rows, layers = [], total }) {
   const edits = [];
   if (Math.abs(total.to - total.from) > EPS) {
-    for (const { index, tag } of tags(html)) {
-      const isRoot = attr(tag, "data-composition-id") !== null;
-      const start = attr(tag, "data-start");
-      const dur = attr(tag, "data-duration");
-      const fullLength = start !== null && dur !== null && Math.abs(+start) < EPS && Math.abs(+dur - total.from) < EPS;
-      if (isRoot || fullLength) edits.push({ index, tag, next: setAttr(tag, "data-duration", num(total.to)) });
+    const root = rootTag(html);
+    edits.push({ index: root.index, tag: root.tag, next: setAttr(root.tag, "data-duration", num(total.to)) });
+    for (const id of layers) {
+      const { index, tag } = sceneTag(html, id);
+      edits.push({ index, tag, next: setAttr(tag, "data-duration", num(total.to)) });
     }
   }
   for (const x of rows) {

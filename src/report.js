@@ -1,4 +1,4 @@
-import { ageDays, MAX_AGE_DAYS } from "./calibration.js";
+import { ageDays, isStale } from "./calibration.js";
 
 const pad = (s, n) => String(s).padEnd(n);
 const lpad = (s, n) => String(s).padStart(n);
@@ -7,9 +7,11 @@ const sec = (x) => `${x.toFixed(1)}s`;
 export function calibrationLine(summary) {
   if (!summary) return "Uncalibrated: default reading rates (estimates). Calibrate with `readpace calibrate`.";
   const age = ageDays(summary);
-  const stale = age > MAX_AGE_DAYS ? "  — STALE, recalibrate" : "";
-  return `Calibrated: k = ${summary.k.toFixed(2)} (n = ${summary.n}, IQR ${summary.iqr[0].toFixed(2)}–` +
-    `${summary.iqr[1].toFixed(2)}, ${age} days old)${stale}`;
+  const base = `k = ${summary.k.toFixed(2)} (n = ${summary.n}, IQR ${summary.iqr[0].toFixed(2)}–` +
+    `${summary.iqr[1].toFixed(2)}, ${age} days old)`;
+  return isStale(summary)
+    ? `Calibration is STALE and NOT applied: ${base}. Using default rates; recalibrate with \`readpace calibrate\`.`
+    : `Calibrated: ${base}`;
 }
 
 export function formatCheck(result, summary) {
@@ -33,7 +35,7 @@ export function formatCheck(result, summary) {
 }
 
 export function formatPlan(round, rows, total) {
-  const lines = [`Round ${round}: ${rows.length} scene(s) re-timed`];
+  const lines = [`Round ${round}: ${rows.length} clip(s) re-timed`];
   const w = Math.max(10, ...rows.map((x) => x.scene.length + 2));
   if (rows.length && total && total.to !== total.from) {
     lines[0] += ` — total ${total.from.toFixed(1)} s → ${total.to.toFixed(1)} s`;

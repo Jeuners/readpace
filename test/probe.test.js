@@ -30,3 +30,10 @@ test("nested blocks: each block counts only its own text", { skip: !chrome && "n
   const r = await probe(fixture, { chromePath: chrome });
   assert.deepEqual(Object.values(r.meta).map((m) => m.text).sort(), ["Intro words here", "one two three four five six"]);
 });
+
+test("per-character spans (SplitText) are joined into words; <br> separates", { skip: !chrome && "no Chrome found", timeout: 60000 }, async () => {
+  const fixture = fileURLToPath(new URL("./fixtures/split.html", import.meta.url));
+  const r = await probe(fixture, { chromePath: chrome });
+  const texts = Object.values(r.meta).map((m) => m.text).sort();
+  assert.deepEqual(texts, ["Hello you", "Use SPF-records and email auth now"]);
+});

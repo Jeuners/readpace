@@ -12,7 +12,7 @@
 
 `cost = max(min, base + perBlock) × data-reading-factor × k`
 
-Words are runs of letters, digits and `@ . $ % _ -` that contain at least one letter or digit, so `ceo@yourdomain.com` is one word in proportional fonts, while a stray `—`, `-` or `...` costs nothing.
+Words are runs of letters, digits and `@ . $ % _ -` (plus apostrophes inside a word) that contain at least one letter or digit, so `ceo@yourdomain.com` and `don't` are one word each in proportional fonts, while a stray `—`, `-` or `...` costs nothing.
 
 ## These are estimates
 

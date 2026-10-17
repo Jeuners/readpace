@@ -21,9 +21,11 @@ First public version, extracted from a production video pipeline.
   factor suggestion.
 - `data-reading-factor` and `data-timing="hold"` attributes.
 - Example composition `examples/spf-dmarc` (hand-timed, five scenes).
-- Calibration solves *k* per scene from the viewer simulation; results need a
-  per-session token.
-- Unit tests, regression tests from review, and headless integration tests.
+- Calibration solves *k* per scene from the viewer simulation, skips scenes that
+  cannot be held with all text visible, drops implausible measurements, stores
+  the reading rates used, and ignores calibrations older than 90 days; results
+  need a per-session token.
+- Unit tests and headless integration tests.
 
 [Unreleased]: https://github.com/Jeuners/readpace/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/Jeuners/readpace/releases/tag/v0.1.0

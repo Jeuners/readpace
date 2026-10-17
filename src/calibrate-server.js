@@ -20,11 +20,27 @@ const TYPES = {
  * Scenes to ask about: everything except data-timing="hold". Playback holds
  * one sampling step before the first block of the scene starts to disappear,
  * so nothing is measured while text is fading out.
+ *
+ * A scene in which some block disappears before the last one appears cannot
+ * be held with all of its text on screen; it is skipped and reported.
  */
-export function calibrationPlan(analysis, step = 0.1) {
+export function calibrationPlan(analysis, step = 0.1, model = {}) {
+  const skipped = [];
+  const usable = analysis.scenes.filter((s) => {
+    if (s.timing === "hold") return false;
+    const firstGone = Math.min(...s.blocks.map((b) => b.end));
+    const lastIn = Math.max(...s.blocks.map((b) => b.start));
+    if (firstGone - step < lastIn) {
+      skipped.push(s.scene);
+      return false;
+    }
+    return true;
+  });
   return {
     token: crypto.randomBytes(16).toString("hex"),
-    scenes: analysis.scenes.filter((s) => s.timing !== "hold").map((s) => ({
+    model,
+    skipped,
+    scenes: usable.map((s) => ({
       scene: s.scene,
       start: s.start,
       holdAt: Math.round((Math.min(...s.blocks.map((b) => b.end)) - step) * 100) / 100,
@@ -38,20 +54,34 @@ export function calibrationPlan(analysis, step = 0.1) {
   };
 }
 
-/** Turn raw key-press times into records with the scale solved from the model. */
+/**
+ * Turn raw key-press times into records with the scale solved from the model.
+ * Measurements the model cannot explain (scale outside SCALE_BOUNDS, e.g. a
+ * key pressed by accident or a window left open) are dropped and reported.
+ * Records carry the reading rates they were measured against.
+ */
 export function toRecords(plan, results) {
   const byScene = new Map(plan.scenes.map((s) => [s.scene, s]));
-  return results.filter((r) => byScene.has(r.scene) && r.measured > 0).map((r) => {
+  const records = [];
+  const rejected = [];
+  for (const r of results) {
     const sc = byScene.get(r.scene);
+    if (!sc || !(r.measured > 0)) continue;
     const unfactored = {
       orient: sc.orient / sc.factor,
       blocks: sc.blocks.map((b) => ({ start: b.start, cost: b.cost / sc.factor })),
     };
-    const rec = { scene: r.scene, factor: sc.factor, measured: r.measured, predicted: sc.readTime };
-    if (sc.factor === 1) rec.kScene = +solveScale(sc, r.measured).toFixed(3);
-    else rec.fScene = +solveScale(unfactored, r.measured).toFixed(3);
-    return rec;
-  });
+    const scale = solveScale(sc.factor === 1 ? sc : unfactored, r.measured);
+    if (scale === null) {
+      rejected.push(r.scene);
+      continue;
+    }
+    const rec = { scene: r.scene, factor: sc.factor, measured: r.measured, predicted: sc.readTime, model: plan.model };
+    rec[sc.factor === 1 ? "kScene" : "fScene"] = +scale.toFixed(3);
+    records.push(rec);
+  }
+  records.rejected = rejected;
+  return records;
 }
 
 /**
@@ -76,11 +106,13 @@ export function serveCalibration({ projectDir, plan, project, port = 8765, calib
             res.writeHead(400);
             return res.end();
           }
-          const summary = addRecords(project, toRecords(plan, results), calibrationFile);
+          const records = toRecords(plan, results);
+          const summary = addRecords(project, records, calibrationFile);
           res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8" });
-          res.end(summary.k ? `k = ${summary.k.toFixed(2)} (n = ${summary.n})` : "no first-viewing scenes measured yet");
+          res.end((summary.k ? `k = ${summary.k.toFixed(2)} (n = ${summary.n})` : "no first-viewing scenes measured yet") +
+            (records.rejected.length ? ` · ${records.rejected.length} implausible measurement(s) dropped` : ""));
           server.close();
-          resolve({ results, summary });
+          resolve({ results, records, rejected: records.rejected, summary });
         });
         return;
       }

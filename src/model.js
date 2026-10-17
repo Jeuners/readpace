@@ -18,8 +18,9 @@ export const DEFAULTS = Object.freeze({
   k: 1.0,            // calibration factor
 });
 
-// a word must contain a letter or digit; stray dashes and ellipses are free
-const WORD_RE = /[\p{L}\p{N}@.$%_-]*[\p{L}\p{N}][\p{L}\p{N}@.$%_-]*/gu;
+// a word must contain a letter or digit; stray dashes and ellipses are free,
+// contractions (don't, it’s) are one word
+const WORD_RE = /[\p{L}\p{N}@.$%_-]*[\p{L}\p{N}][\p{L}\p{N}@.$%_'’-]*/gu;
 
 export function blockCost(meta, cfg = DEFAULTS) {
   let base;
@@ -162,9 +163,12 @@ export function simulateReadTime(scene, scale) {
  * Waiting for staggered entrances does not scale, so measured / predicted would
  * be biased towards 1; solving the simulation is exact under the model.
  */
-export function solveScale(scene, measured, lo = 0.05, hi = 20) {
-  if (simulateReadTime(scene, lo) >= measured) return lo;
-  if (simulateReadTime(scene, hi) <= measured) return hi;
+export const SCALE_BOUNDS = Object.freeze([0.05, 20]);
+
+/** Returns null when the measurement is outside what the model can explain. */
+export function solveScale(scene, measured, lo = SCALE_BOUNDS[0], hi = SCALE_BOUNDS[1]) {
+  if (simulateReadTime(scene, lo) >= measured) return null;
+  if (simulateReadTime(scene, hi) <= measured) return null;
   for (let i = 0; i < 60; i++) {
     const mid = (lo + hi) / 2;
     if (simulateReadTime(scene, mid) < measured) lo = mid;

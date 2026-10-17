@@ -29,6 +29,15 @@ export function loadSummary(file = calibrationPath()) {
   return s && s.k ? s : null;
 }
 
+export const isStale = (summary, today = new Date()) => ageDays(summary, today) > MAX_AGE_DAYS;
+
+/** Reading rates the calibration was measured against differ from the current ones? */
+export function modelMismatch(summary, cfg) {
+  if (!summary?.model) return null;
+  const keys = ["wps", "wpsHead", "cpsMono"].filter((k) => summary.model[k] !== cfg[k]);
+  return keys.length ? keys : null;
+}
+
 export function ageDays(summary, today = new Date()) {
   return Math.floor((today - new Date(summary.updated + "T00:00:00")) / 86400000);
 }
@@ -60,6 +69,8 @@ export function summarize(records, today = new Date()) {
     n: first.length,
     updated: today.toISOString().slice(0, 10),
   };
+  const latest = [...records].reverse().find((r) => r.model);
+  if (latest) out.model = latest.model;
   if (repeat.length) {
     out.kRepeat = r3(median(repeat) / k);
     out.nRepeat = repeat.length;

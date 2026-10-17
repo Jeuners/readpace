@@ -11,6 +11,8 @@ readpace calibration                    # show the current state
 2. For each scene: <kbd>Space</kbd> starts it, it plays in real time and **holds one sampling step before its first block starts to disappear**. Press <kbd>Space</kbd> as soon as you have finished reading. <kbd>N</kbd> skips a scene, <kbd>Esc</kbd> finishes early and saves what has been measured. Scenes with `data-timing="hold"` are not asked.
 3. The measured time runs from the moment the first block is readable — the same reference point as the model's read time — to your key press.
 
+Scenes in which some block disappears before the last one appears cannot be held with all of their text on screen; they are skipped and listed. Measurements the model cannot explain (a solved scale outside 0.05–20, e.g. an accidental key press or a window left open) are dropped and reported.
+
 Holding before the exit matters: if the slide disappeared, a slow reader would be cut off and the measurement would be a lower bound rather than a reading time.
 
 ## Result
@@ -21,7 +23,7 @@ Holding before the exit matters: if the slide disappeared, a slow reader would b
 {
   "records": [
     { "scene": "s1_a", "factor": 1, "measured": 5.84, "predicted": 4.9, "kScene": 1.19,
-      "date": "2026-10-17", "project": "spf-dmarc" }
+      "model": { "wps": 3, "wpsHead": 3.5, "cpsMono": 15 }, "date": "2026-10-17", "project": "spf-dmarc" }
   ],
   "summary": { "k": 1.19, "iqr": [1.08, 1.31], "n": 10, "updated": "2026-10-17" }
 }
@@ -33,7 +35,7 @@ Holding before the exit matters: if the slide disappeared, a slow reader would b
 - `kRepeat = median(fScene) / k` over scenes with `data-reading-factor < 1`, where `fScene` is solved against the unfactored model: the factor a repeated scene actually needs.
 - Records accumulate across sessions and projects; the summary is recomputed from all of them.
 
-`check` and `fit` print the calibration they use on every run, and flag it as stale after 90 days. `--no-calibration` switches back to the defaults.
+`check` and `fit` print the calibration on every run (`check --json` includes it under `calibration`). After 90 days it is shown as stale and **not applied** — the defaults are used until you recalibrate. If the current reading rates (`--wps` etc.) differ from the ones the calibration was measured with, they warn. `--no-calibration` switches back to the defaults.
 
 The calibration server listens on 127.0.0.1 only, serves nothing outside the composition folder, and accepts results only with a per-session token.
 

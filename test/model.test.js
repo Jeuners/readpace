@@ -93,3 +93,9 @@ test("blocks that never become readable are reported", () => {
   assert.equal(r.scenes.length, 0);
   assert.match(r.findings[0].message, /never fully readable/);
 });
+
+test("contractions count as one word; stray dashes and ellipses are free", () => {
+  const a = blockCost(meta({ text: "don't it’s — ... -" }));
+  assert.equal(a, Math.max(DEFAULTS.minBlock, 2 / DEFAULTS.wps + DEFAULTS.perBlock));
+});
+
