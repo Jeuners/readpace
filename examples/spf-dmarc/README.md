@@ -5,8 +5,8 @@ Five slides about protecting a domain with SPF and DMARC, timed **by hand**
 so `fit` can re-time it.
 
 ```bash
-npx readpace check examples/spf-dmarc   # 5 errors
-npx readpace fit examples/spf-dmarc     # proposes 25.0 s → 50.2 s
+node bin/readpace.js check examples/spf-dmarc   # 5 errors
+node bin/readpace.js fit examples/spf-dmarc     # proposes 25.0 s → 50.2 s
 ```
 
 Render it with HyperFrames as usual (`npx hyperframes render examples/spf-dmarc`).

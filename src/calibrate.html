@@ -86,8 +86,7 @@ function done(skipped) {
   cancelAnimationFrame(raf);
   if (!skipped) {
     const t = sc.start + (performance.now() - t0) / 1000;
-    results.push({ scene: sc.scene, factor: sc.factor, measured: +(t - sc.firstReady).toFixed(3),
-                   predicted: sc.readTime, predictedUnfactored: sc.readTimeUnfactored });
+    results.push({ scene: sc.scene, measured: +(t - sc.firstReady).toFixed(3) });
   }
   i++;
   i < plan.scenes.length ? intro() : finish();
@@ -97,7 +96,7 @@ async function finish() {
   prog.textContent = "";
   show(`<h1>Saving …</h1>`);
   const r = await fetch("/result", { method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ results }) });
+    body: JSON.stringify({ token: plan.token, results }) });
   show(`<h1>Done ✓</h1><div>${results.length} measurements saved.</div>
         <small>${await r.text()}</small><small>You can close this window.</small>`);
   msg.textContent = "done";

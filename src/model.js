@@ -18,7 +18,8 @@ export const DEFAULTS = Object.freeze({
   k: 1.0,            // calibration factor
 });
 
-const WORD_RE = /[\p{L}\p{N}@.$%_-]+/gu;
+// a word must contain a letter or digit; stray dashes and ellipses are free
+const WORD_RE = /[\p{L}\p{N}@.$%_-]*[\p{L}\p{N}][\p{L}\p{N}@.$%_-]*/gu;
 
 export function blockCost(meta, cfg = DEFAULTS) {
   let base;
@@ -57,13 +58,14 @@ const r2 = (x) => Math.round(x * 100) / 100;
  *   idle     time the scene stays up after everything has been read
  */
 export function analyse(probeResult, cfg = DEFAULTS) {
-  const { step, meta, samples } = probeResult;
+  const { step, meta, samples, total } = probeResult;
   const scenes = new Map();
   const unreadable = [];
 
   for (const [key, m] of Object.entries(meta)) {
     if (!m.text) continue;
     const win = readyWindow(samples[key], m.text.length, step);
+    if (win) win[1] = Math.min(win[1], total ?? win[1]);
     if (!win) {
       unreadable.push({ block: key, text: m.text });
       continue;
@@ -125,16 +127,48 @@ export function analyse(probeResult, cfg = DEFAULTS) {
       need: r2(orient + blocks.reduce((s, b) => s + b.cost, 0)),
       available: r2(visibleEnd - blocks[0].start),
       readTime: r2(readTime),
+      orient,
       worstDeficit: r2(worst),
       overrun: r2(Math.max(0, overrun)),
       idle,
-      blocks: blocks.map(({ text, start, end, cost, deficit }) => ({ text, start, end, cost: r2(cost), deficit })),
+      blocks: blocks.map(({ text, start, end, cost, deficit }) => ({ text, start, end, cost, deficit })),
     });
   }
 
   report.sort((a, b) => a.start - b.start);
+  if (probeResult.subCompositions) {
+    findings.push({ level: "warning", scene: "-",
+      message: `${probeResult.subCompositions} sub-composition(s) (data-composition-src) are not measured yet`, });
+  }
+  if (!Object.keys(meta).length) {
+    findings.push({ level: "warning", scene: "-", message: "no text found — nothing to measure" });
+  }
   for (const u of unreadable) {
     findings.push({ level: "hint", scene: "-", message: `never fully readable: "${u.text.slice(0, 60)}" (${u.block})` });
   }
   return { config: cfg, scenes: report, findings };
+}
+
+/** Uncapped read time of a scene if every cost (and the orientation) is scaled. */
+export function simulateReadTime(scene, scale) {
+  const first = scene.blocks[0].start;
+  let free = first + scene.orient * scale;
+  for (const b of scene.blocks) free = Math.max(free, b.start) + b.cost * scale;
+  return free - first;
+}
+
+/**
+ * Find the scale s at which the simulated read time equals a measured one.
+ * Waiting for staggered entrances does not scale, so measured / predicted would
+ * be biased towards 1; solving the simulation is exact under the model.
+ */
+export function solveScale(scene, measured, lo = 0.05, hi = 20) {
+  if (simulateReadTime(scene, lo) >= measured) return lo;
+  if (simulateReadTime(scene, hi) <= measured) return hi;
+  for (let i = 0; i < 60; i++) {
+    const mid = (lo + hi) / 2;
+    if (simulateReadTime(scene, mid) < measured) lo = mid;
+    else hi = mid;
+  }
+  return (lo + hi) / 2;
 }

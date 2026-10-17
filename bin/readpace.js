@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import fs from "node:fs";
+import { createRequire } from "node:module";
 import path from "node:path";
 import { parseArgs } from "node:util";
 import { exec } from "node:child_process";
@@ -18,6 +19,7 @@ Usage
   readpace fit [dir] --write  ...and write index.html (backup: index.html.bak)
   readpace calibrate [dir]    Measure your own reading time, slide by slide
   readpace calibration        Show the current calibration
+  readpace --version
 
 Options
   --json                      Machine-readable output (check)
@@ -27,8 +29,12 @@ Options
   --wps-head <n>              Headlines >= ${DEFAULTS.headPx}px, words per second (default ${DEFAULTS.wpsHead})
   --cps-mono <n>              Monospace, characters per second  (default ${DEFAULTS.cpsMono})
   --step <s>                  Sampling step in seconds          (default 0.1)
+  --rounds <n>                Maximum fit rounds                (default 3)
   --port <n>                  Calibration server port           (default 8765)
   --no-open                   Do not open a browser (calibrate)
+
+Exit codes
+  0 ok · 1 slides too short (check) · 2 usage or runtime error
 
 Environment
   CHROME_PATH                 Chrome/Chromium binary (auto-detected otherwise)
@@ -36,29 +42,48 @@ Environment
 
 Docs: https://github.com/Jeuners/readpace`;
 
-const { values: opt, positionals } = parseArgs({
-  allowPositionals: true,
-  options: {
-    json: { type: "boolean" }, strict: { type: "boolean" }, write: { type: "boolean" },
-    "no-calibration": { type: "boolean" }, "no-open": { type: "boolean" }, help: { type: "boolean", short: "h" },
-    wps: { type: "string" }, "wps-head": { type: "string" }, "cps-mono": { type: "string" },
-    step: { type: "string" }, port: { type: "string" }, rounds: { type: "string" },
-  },
-});
+function fail(message) {
+  console.error(message);
+  process.exit(2);
+}
 
+let opt, positionals;
+try {
+  ({ values: opt, positionals } = parseArgs({
+    allowPositionals: true,
+    options: {
+      json: { type: "boolean" }, strict: { type: "boolean" }, write: { type: "boolean" },
+      "no-calibration": { type: "boolean" }, "no-open": { type: "boolean" },
+      help: { type: "boolean", short: "h" }, version: { type: "boolean", short: "v" },
+      wps: { type: "string" }, "wps-head": { type: "string" }, "cps-mono": { type: "string" },
+      step: { type: "string" }, port: { type: "string" }, rounds: { type: "string" },
+    },
+  }));
+} catch (err) {
+  fail(`${err.message}\nRun \`readpace --help\` for usage.`);
+}
+
+if (opt.version) {
+  console.log(createRequire(import.meta.url)("../package.json").version);
+  process.exit(0);
+}
 const [command = "help", target = "."] = positionals;
 if (opt.help || command === "help") {
   console.log(HELP);
   process.exit(0);
 }
 
+function positive(name, fallback) {
+  if (opt[name] === undefined) return fallback;
+  const v = Number(opt[name]);
+  if (!(v > 0) || !Number.isFinite(v)) fail(`--${name} must be a positive number, got "${opt[name]}"`);
+  return v;
+}
+
 function resolveIndex(t) {
   const p = path.resolve(t);
   const index = fs.existsSync(p) && fs.statSync(p).isDirectory() ? path.join(p, "index.html") : p;
-  if (!fs.existsSync(index)) {
-    console.error(`index.html not found: ${index}`);
-    process.exit(2);
-  }
+  if (!fs.existsSync(index)) fail(`index.html not found: ${index}`);
   return index;
 }
 
@@ -66,15 +91,15 @@ function config({ calibrated = true } = {}) {
   const summary = calibrated && !opt["no-calibration"] ? loadSummary() : null;
   const cfg = {
     ...DEFAULTS,
-    ...(opt.wps && { wps: +opt.wps }),
-    ...(opt["wps-head"] && { wpsHead: +opt["wps-head"] }),
-    ...(opt["cps-mono"] && { cpsMono: +opt["cps-mono"] }),
+    wps: positive("wps", DEFAULTS.wps),
+    wpsHead: positive("wps-head", DEFAULTS.wpsHead),
+    cpsMono: positive("cps-mono", DEFAULTS.cpsMono),
     ...(summary && { k: summary.k }),
   };
   return { cfg, summary };
 }
 
-const step = opt.step ? +opt.step : 0.1;
+const step = positive("step", 0.1);
 
 async function check() {
   const { cfg, summary } = config();
@@ -90,24 +115,34 @@ async function fit() {
   const { cfg, summary } = config();
   console.log(calibrationLine(summary));
   const original = fs.readFileSync(index, "utf8");
+  // re-measure a scratch copy next to the original (so relative assets resolve);
+  // index.html itself is only touched by --write
+  const scratch = path.join(path.dirname(index), `.readpace-probe-${process.pid}.html`);
+  const cleanup = () => fs.rmSync(scratch, { force: true });
+  process.once("SIGINT", () => { cleanup(); process.exit(130); });
   let html = original;
   try {
-    for (let round = 1; round <= (+opt.rounds || 3); round++) {
-      if (round > 1) fs.writeFileSync(index, html); // the probe reads from disk
-      const p = plan(html, analyse(await probe(index, { step }), cfg), cfg);
+    for (let round = 1; round <= positive("rounds", 3); round++) {
+      fs.writeFileSync(scratch, html);
+      const measured = await probe(scratch, { step });
+      const p = plan(html, analyse(measured, cfg), cfg, undefined, measured.clips);
+      if (round === 1) p.warnings.forEach((w) => console.log(`WARNING  ${w}`));
       const diff = changed(p);
       console.log(formatPlan(round, diff, p.total));
       if (!diff.length) break;
       html = apply(html, p);
     }
   } finally {
-    fs.writeFileSync(index, original);
+    cleanup();
   }
   if (!opt.write) {
     console.log("\nDry run — use --write to apply.");
     return 0;
   }
-  if (html === original) return 0;
+  if (html === original) {
+    console.log("\nNothing to change.");
+    return 0;
+  }
   fs.writeFileSync(index + ".bak", original);
   fs.writeFileSync(index, html);
   console.log(`\nwritten: ${index} (backup: ${path.basename(index)}.bak)`);
@@ -117,7 +152,7 @@ async function fit() {
 async function calibrate() {
   const index = resolveIndex(target);
   const { cfg } = config({ calibrated: false }); // compare against the raw model
-  const p = calibrationPlan(analyse(await probe(index, { step }), cfg));
+  const p = calibrationPlan(analyse(await probe(index, { step }), cfg), step);
   if (!p.scenes.length) {
     console.error("no scenes to calibrate");
     return 2;
@@ -126,7 +161,7 @@ async function calibrate() {
     projectDir: path.dirname(index),
     plan: p,
     project: path.basename(path.dirname(index)),
-    port: opt.port ? +opt.port : 8765,
+    port: positive("port", 8765),
     onListen(url) {
       console.log(`${p.scenes.length} scenes. Calibration page: ${url}`);
       console.log("Space = finished reading, N = skip, Esc = finish. Ctrl+C aborts without saving.");

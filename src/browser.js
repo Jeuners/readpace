@@ -6,7 +6,8 @@ const HOME = os.homedir();
 
 function newestMatch(base, dirPattern, relative) {
   if (!fs.existsSync(base)) return null;
-  const dirs = fs.readdirSync(base).filter((d) => dirPattern.test(d)).sort().reverse();
+  const dirs = fs.readdirSync(base).filter((d) => dirPattern.test(d))
+    .sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
   for (const d of dirs) {
     for (const rel of relative) {
       const p = path.join(base, d, rel);

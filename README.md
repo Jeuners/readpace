@@ -2,10 +2,13 @@
 
 **Measured slide timing for [HyperFrames](https://hyperframes.heygen.com) compositions.**
 
+> Status: 0.1 — early. Works on single-file compositions; see [Limitations](#limitations).
+
 `readpace` plays your composition in headless Chromium, measures when each block of text is actually readable, simulates a viewer reading it, and tells you which slides disappear before anyone could finish them. It can then re-time the scenes for you, and calibrate its reading model against real people.
 
 ```
-$ npx readpace check examples/spf-dmarc
+$ readpace check examples/spf-dmarc
+Uncalibrated: default reading rates (estimates). Calibrate with `readpace calibrate`.
 
 scene             time  factor    need  readable   late    idle
 s1_a           0.0–4.2    1.00    4.9s      3.5s   1.4s    0.0s ✗
@@ -24,33 +27,33 @@ ERROR    s2_a   3/5 blocks not finished, up to 2.8 s late. First: "Urgent: pleas
 
 ## Why
 
-Slide durations are usually set by feel: *every scene gets five seconds*. That is a guess, and it is usually wrong in the same direction. In the bundled example, timed by hand the usual way, **every one of the five slides** leaves the screen 1.4–2.9 s before a viewer could have read it.
+Slide durations are usually set by feel: *every scene gets five seconds*. That is a guess. In the bundled example, timed by hand the usual way, **every one of the five slides** leaves the screen 1.4–2.9 s before the default (uncalibrated) reading model has finished it — and `readpace calibrate` lets you check that model against real readers.
 
-The underlying problem is the one described in [*Time Is Not Metadata*](https://github.com/Jeuners/Time_Dilation_in_LLM_Agent_Systems) for LLM agent systems: decisions made without **measured** timing information are close to chance; given measured timing, they become reliable. readpace applies that idea to slides (see [Background](#background)).
+The idea is borrowed from [*Time Is Not Metadata*](https://github.com/Jeuners/Time_Dilation_in_LLM_Agent_Systems): in a randomised delegation experiment, LLM agents given measured peer latencies chose the cost-favoured delegate in 100 of 100 trials, against 55 of 100 without. Timing should be measured, not assumed (see [Background](#background)).
 
 ## Quick start
 
-Requires Node ≥ 20 and a Chrome/Chromium binary (auto-detected from Puppeteer's or Playwright's cache, system Chrome, or `CHROME_PATH`).
+Requires Node ≥ 22 and a Chrome/Chromium binary (auto-detected from Puppeteer's or Playwright's cache, system Chrome, or `CHROME_PATH`). readpace is not on npm yet; run it straight from GitHub:
 
 ```bash
-npx readpace check path/to/composition        # which slides are too short?
-npx readpace fit   path/to/composition        # dry run: proposed timing
-npx readpace fit   path/to/composition --write
-npx readpace calibrate path/to/composition    # measure your own reading speed
+npx github:Jeuners/readpace check path/to/composition       # which slides are too short?
+npx github:Jeuners/readpace fit   path/to/composition       # dry run: proposed timing
+npx github:Jeuners/readpace fit   path/to/composition --write
+npx github:Jeuners/readpace calibrate path/to/composition   # measure your own reading speed
 ```
 
-No Chrome yet? `npx @puppeteer/browsers install chrome-headless-shell@stable`
+or clone it and use `node bin/readpace.js …` (the examples below write `readpace` for short). No Chrome yet? `npx @puppeteer/browsers install chrome-headless-shell@stable`
 
 ## Commands
 
 | Command | What it does |
 |---|---|
 | `readpace check [dir]` | Measures every scene. Exit code 1 on errors (`--strict`: also on warnings), so it fits into CI next to `hyperframes check`. `--json` for machine-readable output. |
-| `readpace fit [dir]` | Lengthens scenes by exactly the time they lack, shortens idle ones, shifts the rest, re-measures until stable. Dry run unless `--write` (backup: `index.html.bak`). Requires the [scene convention](#scene-convention). |
+| `readpace fit [dir]` | Lengthens each scene by the time it lacks (its overrun) plus 0.3 s, shortens idle ones, shifts the rest, re-measures until stable. Measures a scratch copy; `index.html` is only touched with `--write` (backup: `index.html.bak`). Requires the [scene convention](#scene-convention). |
 | `readpace calibrate [dir]` | Plays the composition slide by slide in your browser; you press <kbd>Space</kbd> when you have finished reading. Produces a calibration factor *k* with spread and age. |
 | `readpace calibration` | Shows the current calibration. |
 
-Options: `--wps`, `--wps-head`, `--cps-mono` override reading rates, `--no-calibration` ignores *k*, `--step` sets the sampling step (default 0.1 s). See `readpace --help`.
+Options: `--wps`, `--wps-head`, `--cps-mono` override reading rates, `--no-calibration` ignores *k*, `--step` sets the sampling step (default 0.1 s), `--rounds` caps fit rounds (default 3). Exit codes: 0 ok, 1 slides too short (`check`), 2 usage or runtime error. See `readpace --help`.
 
 ## How it works
 
@@ -98,11 +101,11 @@ The default reading rates are reasonable estimates, not facts. `readpace calibra
 
 ![Calibration page](docs/assets/calibrate.png)
 
-Each slide plays in real time and **holds before its exit**, so nothing is measured under time pressure. Time is measured from the first readable block — the same reference the model uses. The results go to `~/.config/readpace/calibration.json` (override with `READPACE_CALIBRATION`):
+Each slide plays in real time and **holds just before its first block starts to disappear**, so nothing is measured under time pressure. Time is measured from the first readable block — the same reference the model uses — and *k* is solved from the viewer simulation, so waiting for staggered entrances does not bias it. The results go to `~/.config/readpace/calibration.json` (override with `READPACE_CALIBRATION`):
 
 | Field | Meaning |
 |---|---|
-| `k` | median(measured ÷ model) over first viewings; multiplies every reading cost |
+| `k` | median over first viewings of the per-scene scale at which the simulated read time equals the measured one; multiplies every reading cost |
 | `iqr` | spread of *k* (25th–75th percentile) — reported, never rounded away |
 | `kRepeat` | measured factor for repeated scenes, a suggestion for `data-reading-factor` |
 | `n`, `updated` | sample size and age; `check` flags calibrations older than 90 days as stale |
@@ -121,25 +124,25 @@ for (const s of result.scenes) console.log(s.scene, s.need, s.available, s.overr
 ## Limitations
 
 - Only text is scored. Images, icons and charts have no reading cost yet.
-- Sub-compositions (`data-composition-src`) are not loaded into the probe yet. `hyperframes lint` recommends them for nested scenes (`nested_structure_needs_subcomposition`), so the scene convention currently trades that warning for measurability. Supporting sub-compositions is the top item on the roadmap.
+- **Single-file compositions only.** Sub-compositions (`data-composition-src`) are not loaded into the probe yet; `check` warns when it finds them. HyperFrames recommends building the root from sub-compositions, so projects structured that way are not measured yet. The bundled example therefore triggers 6 `hyperframes lint` warnings (5× `nested_structure_needs_subcomposition`, 1× `timeline_track_too_dense`; 0 errors, `hyperframes check` passes). Sub-composition support is the top roadmap item.
+- `fit` lays out top-level clips in sequence. Clips that span the whole composition are treated as layers; other parallel clips (overlays, captions) make `fit` stop with an error. `check` handles them.
 - The model assumes the viewer reads everything. Purely decorative text can produce false deficits.
 - Narration is ignored; with a voice-over, speech sets the pace, not the text.
-- Reading rates are tuned for German/English body text on screen. Calibrate for your audience.
+- Default reading rates were chosen for German/English body text on screen and are uncalibrated estimates. Calibrate for your audience.
 
 ## Background
 
-readpace is an application of ideas from:
+readpace borrows ideas from a paper by the same author:
 
-> H.G.O. Dillenberg, **Time Is Not Metadata: Interpretable Timestamps and Measured Action Latency in LLM Agent Systems**, working draft, 2026. <https://github.com/Jeuners/Time_Dilation_in_LLM_Agent_Systems>
+> H.G.O. Dillenberg, **Time Is Not Metadata: Interpretable Timestamps and Measured Action Latency in LLM Agent Systems**, working draft, revision 2, August 2026. <https://github.com/Jeuners/Time_Dilation_in_LLM_Agent_Systems>
 
-No code is shared; the concepts are:
+No code is shared. The paper is about LLM agent systems, not video; readpace transfers three of its ideas by analogy:
 
 | Paper | readpace |
 |---|---|
-| Measured action latency instead of static assumptions moves delegation from chance (55/100) to 100/100 | Readable time is measured from the actual animation, not assumed from durations |
-| Proper time as a count of weighted internal operations, not wall-clock time | Reading need as weighted reading units (words, code characters, blocks) |
-| Separate cumulative progress from instantaneous pace | A repeated scene is recognised, not re-read: `data-reading-factor` |
-| Measurements carry age and uncertainty; unknown estimates stay explicit | *k* with IQR, sample size and age; uncalibrated output says so |
+| In a randomised-role delegation experiment (n = 200), agents given measured per-action latencies of their peers chose the cost-favoured delegate in 100/100 trials vs 55/100 without; the control arm was indistinguishable from chance (p = 0.37). A run without randomised roles did not replicate — measured timing mattered where it could not be inferred from static framing. | Readable time is measured from the actual animation, not inferred from the durations someone typed in |
+| Agent proper time as a monotonic count of weighted internal operations, kept separate from an instantaneous pace estimate (§4.2–4.3) | Reading need as weighted reading units (words, code characters, blocks), kept separate from the reading rate (words/s × *k*) |
+| "A stale rate estimate is worse than no estimate" (§4.3); the follow-up implementation makes unknown or stale estimates explicit ([IMPLEMENTATION.md](https://github.com/Jeuners/Time_Dilation_in_LLM_Agent_Systems/blob/main/IMPLEMENTATION.md)) | *k* is reported with IQR, sample size and age; uncalibrated output says so; calibrations older than 90 days are flagged |
 
 ## Development
 

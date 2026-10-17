@@ -63,3 +63,58 @@ test("nothing to do: changed() is empty and the total is unchanged", () => {
   assert.equal(changed(p).length, 0);
   assert.equal(apply(html(), p), html());
 });
+
+// --- regressions from review ---
+
+const clip = (id, start, duration, extra = {}) => ({ id, start, duration, hasText: true, hold: false, ...extra });
+
+test("textless scenes are shifted along instead of being overlapped", () => {
+  const h = `<div data-composition-id="m" data-start="0" data-duration="15">
+    <div id="s1" data-start="0" data-duration="5"></div>
+    <div id="img" data-start="5" data-duration="5"></div>
+    <div id="s3" data-start="10" data-duration="5"></div></div>`;
+  const p = plan(h, analysis(scene("s1", { overrun: 2 }), scene("s3")), DEFAULTS, undefined,
+    [clip("s1", 0, 5), clip("img", 5, 5, { hasText: false }), clip("s3", 10, 5)]);
+  assert.deepEqual(p.scenes.map((x) => [x.scene, x.newStart, x.newDur]), [["s1", 0, 7.3], ["img", 7.3, 5], ["s3", 12.3, 5]]);
+});
+
+test("full-length layers are not scenes; overlapping clips are rejected", () => {
+  const h = `<div data-composition-id="m" data-start="0" data-duration="10">
+    <div id="logo" data-start="0" data-duration="10"></div>
+    <div id="s1" data-start="0" data-duration="5"></div>
+    <div id="cap" data-start="3" data-duration="4"></div>
+    <div id="s2" data-start="5" data-duration="5"></div></div>`;
+  const clips = [clip("logo", 0, 10), clip("s1", 0, 5), clip("cap", 3, 4), clip("s2", 5, 5)];
+  assert.throws(() => plan(h, analysis(scene("logo", { idle: 8 }), scene("s1"), scene("s2")), DEFAULTS, undefined, clips),
+    /overlap/);
+  const ok = plan(h, analysis(scene("logo", { idle: 8 }), scene("s1"), scene("s2")), DEFAULTS, undefined,
+    clips.filter((c) => c.id !== "cap"));
+  assert.deepEqual(ok.scenes.map((x) => x.scene), ["s1", "s2"]);
+});
+
+test("a hold scene that would turn negative is an error, not a negative duration", () => {
+  const h = `<div data-composition-id="m" data-start="0" data-duration="12">
+    <div id="s1" data-start="0" data-duration="10"></div>
+    <div id="end" data-timing="hold" data-start="10" data-duration="2"></div></div>`;
+  assert.throws(() => plan(h, analysis(scene("s1", { overrun: 4 }), scene("end")), DEFAULTS), /cannot absorb/);
+});
+
+test("sceneTag ignores comments and data-id look-alikes", () => {
+  const h = `<!-- <div id="s1" data-start="9" data-duration="9"> -->
+    <div data-id="s1" data-start="7" data-duration="7"></div>
+    <div id="s1" data-start="1" data-duration="2"></div>`;
+  const t = sceneTag(h, "s1");
+  assert.equal(t.start, 1);
+  assert.equal(t.dur, 2);
+});
+
+test("full-length layers are matched numerically and with either quote style", () => {
+  const h = `<div data-composition-id="m" data-start="0" data-duration="10">
+    <div id="bg" data-start='0' data-duration="10.0"></div>
+    <div id="s1" data-start="0" data-duration="5"></div>
+    <div id="s2" data-start="5" data-duration="5"></div></div>`;
+  const out = apply(h, plan(h, analysis(scene("s1", { overrun: 1 }), scene("s2")), DEFAULTS));
+  assert.match(out, /id="bg" data-start='0' data-duration="11.3"/);
+  assert.equal(compositionDuration(out), 11.3);
+});
+

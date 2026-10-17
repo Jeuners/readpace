@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node: [20, 22]
+        node: [22, 24]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -23,8 +23,11 @@ jobs:
           npx --yes @puppeteer/browsers install chrome-headless-shell@stable --path "$HOME/.cache/puppeteer"
           sudo apt-get update && sudo apt-get install -y libnss3 libatk-bridge2.0-0 libgbm1 libasound2t64 || true
       - run: npm test
-      - name: Example — hand-timed composition must fail the check
+        env:
+          READPACE_REQUIRE_CHROME: "1"
+      - name: Example — hand-timed composition must fail with exit code 1
         run: |
-          if node bin/readpace.js check examples/spf-dmarc; then
-            echo "expected errors"; exit 1
-          fi
+          set +e
+          node bin/readpace.js check examples/spf-dmarc
+          code=$?
+          test "$code" -eq 1 || { echo "expected exit 1 (slides too short), got $code"; exit 1; }

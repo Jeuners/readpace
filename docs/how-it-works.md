@@ -13,7 +13,9 @@ The composition's `index.html` is opened from disk in headless Chromium at 1920�
 - its bounding box intersects the frame, and
 - its text has reached its maximum observed length (typewriter effects count only once complete).
 
-The probe returns, per block, its metadata (scene, font size, monospace or not, reading factor, timing mode, full text) and a list of `[t, readable, textLength]` samples.
+A block's text is its **own** text: text nodes whose nearest non-inline ancestor is the block. Text of nested blocks is counted once, in the nested block.
+
+The probe returns, per block, its metadata (scene, font size, monospace or not, reading factor, timing mode, full text) and a list of `[t, readable, textLength]` samples, plus the top-level clips of the root and the number of sub-compositions (which are reported as not measured).
 
 ## 2. Reading cost (`src/model.js`)
 
@@ -32,20 +34,22 @@ Two passes over the same blocks give two different measures:
 - **Deficit** (capped pass): if a block disappears before the viewer finishes, the viewer gives up at the moment it disappears and moves on. `late = finish − disappear`. This answers *"is this slide too short?"*.
 - **Overrun** (uncapped pass): the viewer is allowed to finish every block. `overrun = max(finish − disappear)`. This answers *"how much longer must the scene be?"*. It is larger than the worst deficit whenever an abandoned block let the viewer start the next block early.
 
-`fit` uses the overrun. An earlier version used the deficit and needed three or more rounds without converging on a real composition; with the overrun it converges in one.
+`fit` uses the overrun: lengthening a scene by its overrun is enough for every block in it, whereas lengthening by the deficit leaves the blocks after an abandoned one short and needs further rounds.
 
 **Idle** is the time between the viewer finishing (capped pass) and the last block disappearing. Scenes marked `data-timing="hold"` are exempt from the idle hint.
 
 ## 4. Fit (`src/fit.js`)
 
-For every scene: `new duration = duration + overrun + 0.3 s` if it lacks time, or `duration − (idle − 0.8 s)` if it idles for more than 2.5 s. Durations are rounded to 0.1 s, minimum 1.5 s. Scenes are then laid out in their original order, keeping the gaps between them.
+`fit` works on the root's **top-level clips**. Clips that span the whole composition (`data-start` 0, `data-duration` equal to the total) are layers and stay put; every other top-level clip must follow the previous one — overlapping clips stop `fit` with an error.
+
+For every scene: `new duration = duration + overrun + 0.3 s` if it lacks time, or `duration − (idle − 0.8 s)` if it idles for more than 2.5 s. Durations are rounded to 0.1 s, minimum 1.5 s. Clips without text keep their duration but move with the rest. Scenes are then laid out in their original order, keeping the gaps between them.
 
 The total length:
 
-- with a trailing `data-timing="hold"` scene, that scene keeps its end and absorbs the shift, so the total stays fixed (a music track, a fixed slot);
+- with a trailing `data-timing="hold"` scene, that scene keeps its end and absorbs the shift, so the total stays fixed (a music track, a fixed slot). If it would shrink below 1.5 s, `fit` stops with an error instead;
 - otherwise the root `data-duration` changes, and so does every layer that spanned the whole composition (`data-start="0"` and `data-duration` equal to the old total: backgrounds, music).
 
-The HTML is changed only in those attributes. readpace then re-probes the new timing and repeats until nothing changes (at most three rounds).
+The HTML is changed only in those attributes; comments, scripts and styles are ignored when looking them up. readpace re-probes a scratch copy next to `index.html` with the new timing and repeats until nothing changes (at most three rounds, `--rounds`). The original file is written only with `--write`.
 
 ## 5. Calibration
 

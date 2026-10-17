@@ -9,7 +9,10 @@ import { DEFAULTS, analyse } from "../src/model.js";
 
 const example = fileURLToPath(new URL("../examples/spf-dmarc/index.html", import.meta.url));
 let chrome = null;
-try { chrome = findChrome(); } catch { /* skip */ }
+try { chrome = findChrome(); } catch (err) {
+  // in CI a missing browser must fail, not silently skip the only real measurement
+  if (process.env.READPACE_REQUIRE_CHROME) throw err;
+}
 
 test("hand-timed example: every scene is too short", { skip: !chrome && "no Chrome found", timeout: 120000 }, async () => {
   const r = analyse(await probe(example, { chromePath: chrome }), DEFAULTS);
@@ -20,4 +23,10 @@ test("hand-timed example: every scene is too short", { skip: !chrome && "no Chro
   const terminal = r.scenes.find((s) => s.scene === "s4_a");
   const dmarc = terminal.blocks.find((b) => b.text.startsWith("_dmarc"));
   assert.ok(dmarc.start > terminal.start + 2, "DMARC line is typed, not instantly readable");
+});
+
+test("nested blocks: each block counts only its own text", { skip: !chrome && "no Chrome found", timeout: 60000 }, async () => {
+  const fixture = fileURLToPath(new URL("./fixtures/nested.html", import.meta.url));
+  const r = await probe(fixture, { chromePath: chrome });
+  assert.deepEqual(Object.values(r.meta).map((m) => m.text).sort(), ["Intro words here", "one two three four five six"]);
 });

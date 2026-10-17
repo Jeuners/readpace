@@ -4,7 +4,7 @@
 |---|---|---|---|
 | Body text | 3.0 words/s | `--wps` | Conservative on-screen reading rate for German/English text in motion. Silent reading of static prose is faster; viewers of moving slides are not. |
 | Headline (≥ 72 px) | 3.5 words/s | `--wps-head` | Short, large lines are taken in faster. |
-| Monospace | 15 non-space chars/s | `--cps-mono` | Just below common subtitle norms (~17 chars/s); code and addresses are denser than prose. |
+| Monospace | 15 non-space chars/s | `--cps-mono` | Roughly in line with subtitle reading-speed norms (around 17–20 chars/s, which count spaces); code and addresses are denser than prose. |
 | Per block | +0.15 s, min 0.4 s | — | Eye movement to a new block; a one-word label still takes a fixation. |
 | Per scene | +0.4 s | — | Orientation after a cut. |
 | Error threshold | > 0.5 s late | — | Below that it is a warning. |
@@ -12,7 +12,7 @@
 
 `cost = max(min, base + perBlock) × data-reading-factor × k`
 
-Words are runs of letters, digits and `@ . $ % _ -`, so `ceo@yourdomain.com` is one word in proportional fonts. Dashes and punctuation are free.
+Words are runs of letters, digits and `@ . $ % _ -` that contain at least one letter or digit, so `ceo@yourdomain.com` is one word in proportional fonts, while a stray `—`, `-` or `...` costs nothing.
 
 ## These are estimates
 

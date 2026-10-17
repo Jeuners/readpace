@@ -22,7 +22,7 @@ browser is found.
   say which. Uncertainty is reported, not hidden.
 - **No new runtime dependencies** without a strong reason. readpace should stay
   a small tool next to HyperFrames, not a framework.
-- Plain ESM, Node ≥ 20, no build step. Match the existing style.
+- Plain ESM, Node ≥ 22, no build step. Match the existing style.
 - One topic per pull request; add a line to `CHANGELOG.md` under *Unreleased*.
 
 ## Good first issues

@@ -16,19 +16,29 @@ import { findChrome } from "./browser.js";
  * @returns {Promise<{total:number, step:number, meta:object, samples:object}>}
  */
 export async function probe(indexHtml, { step = 0.1, chromePath } = {}) {
-  const browser = await puppeteer.launch({
-    executablePath: chromePath || findChrome(),
-    headless: true,
-    args: ["--allow-file-access-from-files", "--hide-scrollbars"],
-  });
+  if (!(step > 0) || !Number.isFinite(step)) throw new Error(`invalid --step: ${step} (must be > 0)`);
+  const args = ["--allow-file-access-from-files", "--hide-scrollbars"];
+  // GitHub-hosted Ubuntu runners restrict user namespaces, which breaks Chrome's sandbox
+  if (process.env.CI || process.env.READPACE_NO_SANDBOX) args.push("--no-sandbox");
+  const browser = await puppeteer.launch({ executablePath: chromePath || findChrome(), headless: true, args });
   try {
     const page = await browser.newPage();
     await page.setViewport({ width: 1920, height: 1080 });
     await page.goto(pathToFileURL(path.resolve(indexHtml)).href, { waitUntil: "networkidle0" });
-    await page.waitForFunction(
-      () => window.__timelines && Object.keys(window.__timelines).length > 0,
-      { timeout: 20000 },
-    );
+    const root = await page.evaluate(() => {
+      const el = document.querySelector("[data-composition-id]");
+      return el ? { duration: parseFloat(el.dataset.duration) } : null;
+    });
+    if (!root) throw new Error("no element with data-composition-id found — is this a HyperFrames composition?");
+    if (!(root.duration > 0)) throw new Error("the root composition needs a positive data-duration");
+    try {
+      await page.waitForFunction(
+        () => window.__timelines && Object.keys(window.__timelines).length > 0,
+        { timeout: 20000 },
+      );
+    } catch {
+      throw new Error('no GSAP timeline registered after 20 s — expected window.__timelines["<id>"] = tl');
+    }
     return await page.evaluate(sampleTimeline, step);
   } finally {
     await browser.close();
@@ -60,17 +70,19 @@ function sampleTimeline(STEP) {
     }
     return parts.join(" > ");
   };
+  // block element -> its own text (text nodes whose nearest non-inline ancestor
+  // is that block; text of nested blocks is not counted twice)
   const blocks = () => {
-    const set = new Set();
+    const map = new Map();
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
     for (let n = walker.nextNode(); n; n = walker.nextNode()) {
       if (!n.nodeValue.trim()) continue;
       let el = n.parentElement;
       if (!el || el.closest("script,style,svg")) continue;
       while (el !== root && isInline(el)) el = el.parentElement;
-      set.add(el);
+      map.set(el, (map.get(el) || "") + " " + n.nodeValue);
     }
-    return [...set];
+    return map;
   };
   const opacityChain = (el) => {
     let o = 1;
@@ -88,9 +100,9 @@ function sampleTimeline(STEP) {
   for (let i = 0; i <= n; i++) {
     const t = +(i * STEP).toFixed(3);
     timelines.forEach((tl) => tl.seek(t, false));
-    for (const el of blocks()) {
+    for (const [el, raw] of blocks()) {
       const key = cssPath(el);
-      const text = el.innerText.replace(/\s+/g, " ").trim();
+      const text = raw.replace(/\s+/g, " ").trim();
       const clips = clipsOf(el);
       if (!meta[key]) {
         const cs = getComputedStyle(el);
@@ -119,5 +131,14 @@ function sampleTimeline(STEP) {
       (samples[key] ||= []).push([t, visible ? 1 : 0, text.length]);
     }
   }
-  return { total, step: STEP, meta, samples };
+  // top-level clips (direct children of the root), used by fit to lay out scenes
+  const clips = [...root.children].filter((c) => c.hasAttribute("data-start")).map((c) => ({
+    id: c.id || null,
+    start: +c.dataset.start,
+    duration: +c.dataset.duration,
+    hasText: !!c.innerText.trim(),
+    hold: c.dataset.timing === "hold",
+  }));
+  const subCompositions = root.querySelectorAll("[data-composition-src]").length;
+  return { total, step: STEP, meta, samples, clips, subCompositions };
 }

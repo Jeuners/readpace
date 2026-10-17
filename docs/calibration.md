@@ -1,14 +1,14 @@
 # Calibration
 
 ```bash
-npx readpace calibrate path/to/composition
-npx readpace calibration          # show the current state
+readpace calibrate path/to/composition   # or: npx github:Jeuners/readpace calibrate …
+readpace calibration                    # show the current state
 ```
 
 ## Procedure
 
 1. readpace probes the composition with the **uncalibrated** model and starts a local server on `127.0.0.1:8765` (`--port`). Your browser opens the calibration page (`--no-open` to open it yourself).
-2. For each scene: <kbd>Space</kbd> starts it, it plays in real time and **holds just before its exit**. Press <kbd>Space</kbd> as soon as you have finished reading. <kbd>N</kbd> skips a scene, <kbd>Esc</kbd> finishes early and saves what has been measured. Scenes with `data-timing="hold"` are not asked.
+2. For each scene: <kbd>Space</kbd> starts it, it plays in real time and **holds one sampling step before its first block starts to disappear**. Press <kbd>Space</kbd> as soon as you have finished reading. <kbd>N</kbd> skips a scene, <kbd>Esc</kbd> finishes early and saves what has been measured. Scenes with `data-timing="hold"` are not asked.
 3. The measured time runs from the moment the first block is readable — the same reference point as the model's read time — to your key press.
 
 Holding before the exit matters: if the slide disappeared, a slow reader would be cut off and the measurement would be a lower bound rather than a reading time.
@@ -20,19 +20,22 @@ Holding before the exit matters: if the slide disappeared, a slow reader would b
 ```json
 {
   "records": [
-    { "scene": "s1_a", "factor": 1, "measured": 5.84, "predicted": 4.9, "predictedUnfactored": 4.9,
+    { "scene": "s1_a", "factor": 1, "measured": 5.84, "predicted": 4.9, "kScene": 1.19,
       "date": "2026-10-17", "project": "spf-dmarc" }
   ],
   "summary": { "k": 1.19, "iqr": [1.08, 1.31], "n": 10, "updated": "2026-10-17" }
 }
 ```
 
-- `k = median(measured / predicted)` over scenes without a reading factor. Every reading cost is multiplied by `k`.
-- `iqr` — the spread of the ratios. A wide IQR means the model's *mix* of rates is off, not just its scale.
-- `kRepeat = median(measured / predictedUnfactored) / k` over scenes with `data-reading-factor < 1`: the factor a repeated scene actually needs.
+- `kScene` is the scale at which the **simulated** read time of that scene equals the measured one (solved by bisection). A plain ratio `measured / predicted` would be biased towards 1, because waiting for staggered entrances is part of both and does not scale with reading speed.
+- `k = median(kScene)` over scenes without a reading factor. Every reading cost is multiplied by `k`.
+- `iqr` — the spread of the per-scene values. A wide IQR means the model's *mix* of rates is off, not just its scale.
+- `kRepeat = median(fScene) / k` over scenes with `data-reading-factor < 1`, where `fScene` is solved against the unfactored model: the factor a repeated scene actually needs.
 - Records accumulate across sessions and projects; the summary is recomputed from all of them.
 
 `check` and `fit` print the calibration they use on every run, and flag it as stale after 90 days. `--no-calibration` switches back to the defaults.
+
+The calibration server listens on 127.0.0.1 only, serves nothing outside the composition folder, and accepts results only with a per-session token.
 
 ## Good practice
 

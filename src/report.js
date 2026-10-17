@@ -34,11 +34,12 @@ export function formatCheck(result, summary) {
 
 export function formatPlan(round, rows, total) {
   const lines = [`Round ${round}: ${rows.length} scene(s) re-timed`];
+  const w = Math.max(10, ...rows.map((x) => x.scene.length + 2));
   if (rows.length && total && total.to !== total.from) {
     lines[0] += ` — total ${total.from.toFixed(1)} s → ${total.to.toFixed(1)} s`;
   }
   for (const x of rows) {
-    lines.push(`  ${pad(x.scene, 10)}${lpad(x.start.toFixed(1), 7)} +${pad(x.dur.toFixed(1), 6)}→` +
+    lines.push(`  ${pad(x.scene, w)}${lpad(x.start.toFixed(1), 7)} +${pad(x.dur.toFixed(1), 6)}→` +
       `${lpad(x.newStart.toFixed(1), 7)} +${x.newDur.toFixed(1)}`);
   }
   return lines.join("\n");

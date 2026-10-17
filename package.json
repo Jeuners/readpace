@@ -12,17 +12,18 @@
   "files": [
     "bin",
     "src",
-    "docs",
+    "docs/*.md",
+    "CHANGELOG.md",
     "README.md",
     "LICENSE"
   ],
   "scripts": {
-    "test": "node --test test/*.test.js",
+    "test": "node --test",
     "example:check": "node bin/readpace.js check examples/spf-dmarc",
     "example:fit": "node bin/readpace.js fit examples/spf-dmarc"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "dependencies": {
     "puppeteer-core": "^24.0.0"

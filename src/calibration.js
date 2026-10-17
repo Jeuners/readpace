@@ -5,7 +5,8 @@ import path from "node:path";
 /**
  * Calibration turns the reading model from an estimate into a measurement.
  * Records are kept per person/audience in a JSON file; the summary holds
- *   k        median(measured / model) over first viewings
+ *   k        median over first viewings of the per-scene scale that makes the
+ *            simulated read time match the measured one
  *   iqr      spread of k (25th–75th percentile) — report it, don't round it away
  *   kRepeat  measured factor for repeated scenes (data-reading-factor < 1),
  *            relative to k — a suggestion for that attribute
@@ -43,9 +44,13 @@ const r3 = (x) => Math.round(x * 1000) / 1000;
 const median = (xs) => quantile([...xs].sort((a, b) => a - b), 0.5);
 
 export function summarize(records, today = new Date()) {
-  const first = records.filter((r) => r.factor === 1 && r.predicted > 0).map((r) => r.measured / r.predicted);
-  const repeat = records.filter((r) => r.factor < 1 && r.predictedUnfactored > 0)
-    .map((r) => r.measured / r.predictedUnfactored);
+  // kScene / fScene are solved from the model (see solveScale); plain ratios are
+  // the fallback for records written without them
+  const first = records.filter((r) => r.factor === 1)
+    .map((r) => r.kScene ?? (r.predicted > 0 ? r.measured / r.predicted : NaN)).filter(Number.isFinite);
+  const repeat = records.filter((r) => r.factor < 1)
+    .map((r) => r.fScene ?? (r.predictedUnfactored > 0 ? r.measured / r.predictedUnfactored : NaN))
+    .filter(Number.isFinite);
   if (!first.length) return {};
   const sorted = [...first].sort((a, b) => a - b);
   const k = median(first);
