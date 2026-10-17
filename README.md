@@ -1,5 +1,7 @@
 # readpace
 
+[![CI](https://github.com/Jeuners/readpace/actions/workflows/ci.yml/badge.svg)](https://github.com/Jeuners/readpace/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 **Measured slide timing for [HyperFrames](https://hyperframes.heygen.com) compositions.**
 
 > Status: 0.1 — early. Works on single-file compositions; see [Limitations](#limitations).
