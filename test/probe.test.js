@@ -49,3 +49,13 @@ test("compositions that rely on runtime globals (__timelines, getVariables) work
   const r = await probe(fixture, { chromePath: chrome });
   assert.deepEqual(Object.values(r.meta).map((m) => m.text), ["Defaults come from the declaration"]);
 });
+
+test("motion text: typed + blinking cursor, decode, glitch at the exit, content underscores", { skip: !chrome && "no Chrome found", timeout: 60000 }, async () => {
+  const fixture = fileURLToPath(new URL("./fixtures/effects.html", import.meta.url));
+  const r = await probe(fixture, { chromePath: chrome });
+  const text = Object.fromEntries(Object.entries(r.meta).map(([k, m]) => [k, m.text]));
+  assert.deepEqual(text, { "#typed": "> Wake up.", "#decode": "Decoded words", "#glitch": "Stable text", "#snake": "snake_case_" });
+  const res = analyse(r, DEFAULTS);
+  const decode = res.scenes[0].blocks.find((b) => b.block === "#decode");
+  assert.ok(decode.start >= 1.9, `decode readable only once decoded, got ${decode.start}`);
+});

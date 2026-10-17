@@ -33,13 +33,11 @@ export function blockCost(meta, cfg = DEFAULTS) {
   return Math.max(cfg.minBlock, base + cfg.perBlock) * meta.factor * cfg.k;
 }
 
-export const stripCursor = (s) => s.replace(/[\s_|▌█▏]+$/u, "");
-
 /**
  * The block's readable window: the longest contiguous interval in which it is
- * visible and shows its final text (cursor ignored). "Final text", not "full
- * length": scramble/decode effects have full length long before they are
- * legible, and flickering states should not count as a brief early window.
+ * visible and shows its text (as chosen by text.js). Text, not length:
+ * scramble/decode effects have full length long before they are legible, and
+ * flickering states should not count as a brief early window.
  */
 export function readyWindow(samples, finalText, step) {
   let best = null;
@@ -49,7 +47,7 @@ export function readyWindow(samples, finalText, step) {
     start = null;
   };
   for (const [t, visible, text] of samples) {
-    const ok = visible && stripCursor(String(text)) === finalText;
+    const ok = visible && text === finalText;
     if (ok && start === null) start = t;
     else if (!ok) close(t);
   }

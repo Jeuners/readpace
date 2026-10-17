@@ -54,11 +54,6 @@ test("readyWindow returns null when never complete and visible", () => {
   assert.equal(readyWindow([[0, 0, "Hello"], [0.1, 1, "He"]], "Hello", 0.1), null);
 });
 
-test("a blinking cursor does not break the window", () => {
-  const s = [[0, 1, "Go_"], [0.1, 1, "Go"], [0.2, 1, "Go_"], [0.3, 1, "Go"], [0.4, 0, "Go"]];
-  assert.deepEqual(readyWindow(s, "Go", 0.1), [0, 0.4]);
-});
-
 test("scrambled text of full length is not readable until decoded", () => {
   const s = [[0, 1, "x#9k"], [0.1, 1, "Wa#k"], [0.2, 1, "Wake"], [0.3, 1, "Wake"], [0.4, 0, "Wake"]];
   assert.deepEqual(readyWindow(s, "Wake", 0.1), [0.2, 0.4]);

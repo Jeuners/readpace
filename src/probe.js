@@ -3,6 +3,7 @@ import { pathToFileURL } from "node:url";
 import puppeteer from "puppeteer-core";
 import { findChrome } from "./browser.js";
 import { RUNTIME_SHIM } from "./runtime-shim.js";
+import { normalizeBlock } from "./text.js";
 
 /**
  * Play a HyperFrames composition in headless Chromium and record, for every
@@ -11,8 +12,9 @@ import { RUNTIME_SHIM } from "./runtime-shim.js";
  * A reading block is the nearest non-inline ancestor of a text node, so
  * <em>, <b> and <span> belong to the surrounding block. A block counts as
  * readable at time t when every enclosing clip (data-start/data-duration) is
- * active, its cumulative opacity is >= 0.85, it intersects the frame and its
- * text is complete (typewriter effects count from the last character).
+ * active, its cumulative opacity is >= 0.85, it intersects the frame and it
+ * shows the text it is meant to be read with (see text.js: typed, decoded,
+ * cursor ignored where it blinks).
  *
  * @returns {Promise<{total:number, step:number, meta:object, samples:object}>}
  */
@@ -29,7 +31,11 @@ export async function probe(indexHtml, { step = 0.1, chromePath } = {}) {
     // "load", not "networkidle": <video>/<audio> keep fetching ranges and would
     // never let the network go idle. Fonts matter for layout, so wait for them.
     await page.goto(pathToFileURL(path.resolve(indexHtml)).href, { waitUntil: "load", timeout: 60000 });
-    await page.evaluate(() => document.fonts && document.fonts.ready);
+    // a hanging font request must not block the probe
+    await page.evaluate(() => Promise.race([
+      document.fonts ? document.fonts.ready : Promise.resolve(),
+      new Promise((r) => setTimeout(r, 10000)),
+    ]));
     const root = await page.evaluate(() => {
       const el = document.querySelector("[data-composition-id]");
       return el ? { duration: parseFloat(el.dataset.duration) } : null;
@@ -44,7 +50,13 @@ export async function probe(indexHtml, { step = 0.1, chromePath } = {}) {
     } catch {
       throw new Error('no GSAP timeline registered after 20 s — expected window.__timelines["<id>"] = tl');
     }
-    return await page.evaluate(sampleTimeline, step);
+    const result = await page.evaluate(sampleTimeline, step);
+    for (const [key, list] of Object.entries(result.samples)) {
+      const n = normalizeBlock(list);
+      result.samples[key] = n.samples;
+      result.meta[key].text = n.text;
+    }
+    return result;
   } finally {
     await browser.close();
   }
@@ -152,16 +164,6 @@ function sampleTimeline(STEP) {
       (samples[key] ||= []).push([t, visible ? 1 : 0, text]);
     }
   }
-  // A block's final text is what it shows the last time it is visible (typing,
-  // decoding and flicker effects end there); a trailing cursor is not text.
-  const stripCursor = (s) => s.replace(/[\s_|▌█▏]+$/u, "");
-  for (const [key, list] of Object.entries(samples)) {
-    let fin = "";
-    for (let i = list.length - 1; i >= 0; i--) if (list[i][1] && list[i][2]) { fin = list[i][2]; break; }
-    if (!fin) fin = list.reduce((a, s) => (s[2].length > a.length ? s[2] : a), "");
-    meta[key].text = stripCursor(fin);
-  }
-
   // outermost clips under the root (the "scenes" check groups by), used by fit
   const clips = [...root.querySelectorAll("[data-start]")].filter((c) => {
     for (let e = c.parentElement; e && e !== root; e = e.parentElement) if (e.hasAttribute("data-start")) return false;

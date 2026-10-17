@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"></head>
+<body style="margin:0">
+<div id="root" data-composition-id="main" data-start="0" data-duration="6" data-width="1920" data-height="1080">
+  <div id="s1" class="clip" data-start="0" data-duration="6">
+    <div id="typed"></div>
+    <div id="decode"></div>
+    <div id="glitch"></div>
+    <div id="snake"></div>
+  </div>
+</div>
+<script>
+  // deterministic effects as a pure function of t, driven by seek()
+  const $ = (id) => document.getElementById(id);
+  const TYPED = "> Wake up.", WORD = "Decoded words", SCR = "#@%&*+<>=";
+  window.__timelines = { main: { seek(t) {
+    const n = Math.min(TYPED.length, Math.floor(t * 10));
+    $("typed").textContent = TYPED.slice(0, n) + (n < TYPED.length || Math.floor(t * 2) % 2 === 0 ? "_" : "");
+    const p = Math.min(1, t / 2);
+    $("decode").textContent = [...WORD].map((c, i) => c === " " || p >= (i + 1) / WORD.length ? c : SCR[(i + Math.floor(t * 10)) % SCR.length]).join("");
+    $("glitch").textContent = t < 5.5 ? "Stable text" : "S#@b%e &e*t";
+    $("snake").textContent = "snake_case_";
+  } } };
+</script>
+</body></html>

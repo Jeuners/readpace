@@ -4,7 +4,7 @@
 
 **Measured slide timing for [HyperFrames](https://hyperframes.heygen.com) compositions.**
 
-> Status: 0.1 — early. Works on single-file compositions; see [Limitations](#limitations).
+> Status: 0.2 — early. Works on single-file compositions; see [Limitations](#limitations).
 
 ![The same slide, hand-timed and then timed with readpace: words light up at the simulated reading pace](docs/assets/demo.gif)
 

@@ -11,9 +11,9 @@ The composition's `index.html` is opened from disk in headless Chromium at 1920�
 - every enclosing element with `data-start` is active (`start ≤ t < start + duration`) — this mirrors the HyperFrames runtime, which hides inactive clips,
 - the product of `opacity` along its ancestor chain is ≥ 0.85, and nothing in the chain is `display: none` or `visibility: hidden`,
 - its bounding box intersects the frame, and
-- its text equals its **final text** — what it shows the last time it is visible, with a trailing cursor (`_`, `|`, `▌`, `█`) ignored. Typewriter effects count once typed, scramble/decode effects once legible (they have full length long before that), and a blinking cursor does not interrupt reading.
+- it shows **its text**: the non-empty text that stays on screen longest in one stretch (ties: the later one). Typewriter effects count once typed, scramble/decode effects once legible (they have full length long before that), and a glitch or backspace right before the exit does not replace the text. A single trailing cursor (`_ | ▌ █ ▏`) is ignored where it blinks — that is, where the same text also appears without it — so content like `snake_case_` is kept.
 
-If a block is readable in several stretches (flicker, a state that toggles before it settles), its readable window is the **longest** one.
+If a block is readable in several stretches, its readable window is the **longest** one. One phase per block: a block that shows two different messages, or appears twice, is measured on its longest phase only (see `src/text.js`).
 
 A block's text is its **own** text, in document order: inline descendants (including `inline-block`, e.g. per-character SplitText spans) are joined without extra spaces, while `<br>` and nested blocks act as word boundaries. Text of nested blocks is counted once, in the nested block.
 

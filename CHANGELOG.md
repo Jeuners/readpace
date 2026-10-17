@@ -6,7 +6,20 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
-## [0.1.1] — 2026-10-17
+## [0.2.0] — 2026-10-17
+
+Measurements change in this release: readable windows are now based on the text
+a block actually shows, so numbers can shift (usually towards *more* needed
+time for decode/scramble effects).
+
+### Changed
+- Readability is decided per block by `src/text.js` (`normalizeBlock`, exported):
+  the non-empty text that stays on screen longest in one stretch (ties: later),
+  with a single trailing cursor removed only where it blinks. Previously a
+  block was readable once it reached its maximum length.
+- `probe()` samples are now `[t, visible, text]` (were `[t, visible, length]`),
+  and `readyWindow(samples, text, step)` takes the text instead of a length.
+- The readable window is the longest stable stretch, not the first.
 
 ### Added
 - `check --json`: each block carries its selector (`block`), so tools can map
@@ -19,11 +32,14 @@ All notable changes to this project are documented here. The format follows
   `window.__timelines = {}`, `__hyperframes.getVariables()`) now load: readpace
   provides a minimal runtime shim, also on the calibration page.
 - Text marked `aria-hidden="true"` (decorative duplicates) is no longer counted.
-- A block counts as readable when it shows its final text, not merely its full
-  length: scramble/decode effects were counted as readable while still
-  scrambled (too optimistic), a blinking cursor cut readable windows short, and
-  flickering states produced tiny early windows. The readable window is now
-  the longest stable stretch.
+- Scramble/decode effects were counted as readable while still scrambled (too
+  optimistic); a blinking cursor cut readable windows short; flickering states
+  produced tiny early windows; a glitch or backspace right before the exit
+  replaced the text being measured.
+- Web fonts can delay the probe by at most 10 s; navigation timeout is 60 s.
+- The runtime shim is inserted after `<head>` (not `<header>`), else after
+  `<html>` or the doctype, never before it (quirks mode); `getVariables()`
+  merges every `data-composition-variables` declaration.
 
 ## [0.1.0] — 2026-10-17
 
@@ -46,6 +62,6 @@ First public version, extracted from a production video pipeline.
   need a per-session token.
 - Unit tests and headless integration tests.
 
-[Unreleased]: https://github.com/Jeuners/readpace/compare/v0.1.1...HEAD
-[0.1.1]: https://github.com/Jeuners/readpace/compare/v0.1.0...v0.1.1
+[Unreleased]: https://github.com/Jeuners/readpace/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/Jeuners/readpace/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Jeuners/readpace/releases/tag/v0.1.0
