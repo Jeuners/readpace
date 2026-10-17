@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- `check --json`: each block carries its selector (`block`), so tools can map
+  results back to the DOM.
+
 ## [0.1.0] — 2026-10-17
 
 First public version, extracted from a production video pipeline.

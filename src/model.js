@@ -132,7 +132,7 @@ export function analyse(probeResult, cfg = DEFAULTS) {
       worstDeficit: r2(worst),
       overrun: r2(Math.max(0, overrun)),
       idle,
-      blocks: blocks.map(({ text, start, end, cost, deficit }) => ({ text, start, end, cost, deficit })),
+      blocks: blocks.map(({ block, text, start, end, cost, deficit }) => ({ block, text, start, end, cost, deficit })),
     });
   }
 
