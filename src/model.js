@@ -33,15 +33,28 @@ export function blockCost(meta, cfg = DEFAULTS) {
   return Math.max(cfg.minBlock, base + cfg.perBlock) * meta.factor * cfg.k;
 }
 
-/** First contiguous interval in which the block is visible and complete. */
-export function readyWindow(samples, fullLength, step) {
+export const stripCursor = (s) => s.replace(/[\s_|▌█▏]+$/u, "");
+
+/**
+ * The block's readable window: the longest contiguous interval in which it is
+ * visible and shows its final text (cursor ignored). "Final text", not "full
+ * length": scramble/decode effects have full length long before they are
+ * legible, and flickering states should not count as a brief early window.
+ */
+export function readyWindow(samples, finalText, step) {
+  let best = null;
   let start = null;
-  for (const [t, visible, length] of samples) {
-    const ok = visible && length >= fullLength;
+  const close = (end) => {
+    if (start !== null && (!best || end - start > best[1] - best[0])) best = [start, end];
+    start = null;
+  };
+  for (const [t, visible, text] of samples) {
+    const ok = visible && stripCursor(String(text)) === finalText;
     if (ok && start === null) start = t;
-    else if (!ok && start !== null) return [start, t];
+    else if (!ok) close(t);
   }
-  return start === null ? null : [start, samples[samples.length - 1][0] + step];
+  close(samples[samples.length - 1][0] + step);
+  return best;
 }
 
 const r2 = (x) => Math.round(x * 100) / 100;
@@ -65,7 +78,7 @@ export function analyse(probeResult, cfg = DEFAULTS) {
 
   for (const [key, m] of Object.entries(meta)) {
     if (!m.text) continue;
-    const win = readyWindow(samples[key], m.text.length, step);
+    const win = readyWindow(samples[key], m.text, step);
     if (win) win[1] = Math.min(win[1], total ?? win[1]);
     if (!win) {
       unreadable.push({ block: key, text: m.text });

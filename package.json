@@ -1,6 +1,6 @@
 {
   "name": "readpace",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Measured slide timing for HyperFrames compositions: checks that every slide stays readable long enough, re-times scenes from reading demand, and calibrates against real readers.",
   "type": "module",
   "bin": {

@@ -14,7 +14,7 @@ function fakeProbe(blocks, total = 10, step = 0.1) {
     out.samples[b.key] = [];
     for (let i = 0; i <= Math.round(total / step); i++) {
       const t = +(i * step).toFixed(3);
-      out.samples[b.key].push([t, t >= b.from && t < b.to ? 1 : 0, b.text.length]);
+      out.samples[b.key].push([t, t >= b.from && t < b.to ? 1 : 0, b.text]);
     }
   }
   return out;
@@ -45,13 +45,28 @@ test("reading factor and calibration k scale the cost", () => {
   assert.equal(blockCost(meta({ text: "one two three four five six" }), { ...DEFAULTS, k: 2 }), base * 2);
 });
 
-test("readyWindow waits for the full text (typewriter)", () => {
-  const samples = [[0, 1, 0], [0.1, 1, 3], [0.2, 1, 6], [0.3, 1, 6], [0.4, 0, 6]];
-  assert.deepEqual(readyWindow(samples, 6, 0.1), [0.2, 0.4]);
+test("readyWindow waits for the final text (typewriter)", () => {
+  const samples = [[0, 1, ""], [0.1, 1, "Hel"], [0.2, 1, "Hello!"], [0.3, 1, "Hello!"], [0.4, 0, "Hello!"]];
+  assert.deepEqual(readyWindow(samples, "Hello!", 0.1), [0.2, 0.4]);
 });
 
 test("readyWindow returns null when never complete and visible", () => {
-  assert.equal(readyWindow([[0, 0, 5], [0.1, 1, 2]], 5, 0.1), null);
+  assert.equal(readyWindow([[0, 0, "Hello"], [0.1, 1, "He"]], "Hello", 0.1), null);
+});
+
+test("a blinking cursor does not break the window", () => {
+  const s = [[0, 1, "Go_"], [0.1, 1, "Go"], [0.2, 1, "Go_"], [0.3, 1, "Go"], [0.4, 0, "Go"]];
+  assert.deepEqual(readyWindow(s, "Go", 0.1), [0, 0.4]);
+});
+
+test("scrambled text of full length is not readable until decoded", () => {
+  const s = [[0, 1, "x#9k"], [0.1, 1, "Wa#k"], [0.2, 1, "Wake"], [0.3, 1, "Wake"], [0.4, 0, "Wake"]];
+  assert.deepEqual(readyWindow(s, "Wake", 0.1), [0.2, 0.4]);
+});
+
+test("flicker: the longest stable window wins over an early blip", () => {
+  const s = [[0, 1, "ONLINE"], [0.1, 1, "DOWN"], [0.2, 1, "ONLINE"], [0.3, 1, "DOWN"], [0.4, 1, "DOWN"], [0.5, 1, "DOWN"]];
+  assert.deepEqual(readyWindow(s, "DOWN", 0.1), [0.3, 0.6]);
 });
 
 test("a long-enough scene has no errors, only an idle hint", () => {

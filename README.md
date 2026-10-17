@@ -63,7 +63,7 @@ Options: `--wps`, `--wps-head`, `--cps-mono` override reading rates, `--no-calib
 
 ## How it works
 
-1. **Probe.** The composition is loaded in headless Chromium and every registered GSAP timeline in `window.__timelines` is seeked in 0.1 s steps. A *reading block* is the nearest non-inline ancestor of a text node. A block is *readable* at time *t* when all enclosing clips (`data-start`/`data-duration`) are active, its cumulative opacity is ≥ 0.85, it is inside the frame, and its text is complete — typewriter effects count from the last character.
+1. **Probe.** The composition is loaded in headless Chromium and every registered GSAP timeline in `window.__timelines` is seeked in 0.1 s steps. A *reading block* is the nearest non-inline ancestor of a text node. A block is *readable* at time *t* when all enclosing clips (`data-start`/`data-duration`) are active, its cumulative opacity is ≥ 0.85, it is inside the frame, and it shows its final text — typewriter and scramble/decode effects count once they are legible, a blinking cursor is ignored.
 2. **Model.** Each block has a reading cost: words ÷ 3.0 words/s for body text, ÷ 3.5 for headlines (≥ 72 px), non-space characters ÷ 15/s for monospace, plus 0.15 s per block and 0.4 s orientation per scene. These are [estimates until calibrated](docs/reading-model.md).
 3. **Viewer simulation.** A simulated viewer reads the blocks of a scene in order of appearance and starts a block once it is readable and the previous one is finished. Per scene readpace reports:
    - **late (deficit):** how long after a block disappears the viewer would finish it,

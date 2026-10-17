@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.1] — 2026-10-17
+
 ### Added
 - `check --json`: each block carries its selector (`block`), so tools can map
   results back to the DOM.
@@ -17,6 +19,11 @@ All notable changes to this project are documented here. The format follows
   `window.__timelines = {}`, `__hyperframes.getVariables()`) now load: readpace
   provides a minimal runtime shim, also on the calibration page.
 - Text marked `aria-hidden="true"` (decorative duplicates) is no longer counted.
+- A block counts as readable when it shows its final text, not merely its full
+  length: scramble/decode effects were counted as readable while still
+  scrambled (too optimistic), a blinking cursor cut readable windows short, and
+  flickering states produced tiny early windows. The readable window is now
+  the longest stable stretch.
 
 ## [0.1.0] — 2026-10-17
 
@@ -39,5 +46,6 @@ First public version, extracted from a production video pipeline.
   need a per-session token.
 - Unit tests and headless integration tests.
 
-[Unreleased]: https://github.com/Jeuners/readpace/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/Jeuners/readpace/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/Jeuners/readpace/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/Jeuners/readpace/releases/tag/v0.1.0

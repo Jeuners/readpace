@@ -11,7 +11,9 @@ The composition's `index.html` is opened from disk in headless Chromium at 1920�
 - every enclosing element with `data-start` is active (`start ≤ t < start + duration`) — this mirrors the HyperFrames runtime, which hides inactive clips,
 - the product of `opacity` along its ancestor chain is ≥ 0.85, and nothing in the chain is `display: none` or `visibility: hidden`,
 - its bounding box intersects the frame, and
-- its text has reached its maximum observed length (typewriter effects count only once complete).
+- its text equals its **final text** — what it shows the last time it is visible, with a trailing cursor (`_`, `|`, `▌`, `█`) ignored. Typewriter effects count once typed, scramble/decode effects once legible (they have full length long before that), and a blinking cursor does not interrupt reading.
+
+If a block is readable in several stretches (flicker, a state that toggles before it settles), its readable window is the **longest** one.
 
 A block's text is its **own** text, in document order: inline descendants (including `inline-block`, e.g. per-character SplitText spans) are joined without extra spaces, while `<br>` and nested blocks act as word boundaries. Text of nested blocks is counted once, in the nested block.
 

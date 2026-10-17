@@ -149,10 +149,19 @@ function sampleTimeline(STEP) {
       const onScreen = r.width > 0 && r.height > 0 && r.right > 0 && r.bottom > 0 &&
         r.left < W && r.top < H;
       const visible = active && onScreen && opacityChain(el) >= 0.85;
-      if (text.length > meta[key].text.length) meta[key].text = text;
-      (samples[key] ||= []).push([t, visible ? 1 : 0, text.length]);
+      (samples[key] ||= []).push([t, visible ? 1 : 0, text]);
     }
   }
+  // A block's final text is what it shows the last time it is visible (typing,
+  // decoding and flicker effects end there); a trailing cursor is not text.
+  const stripCursor = (s) => s.replace(/[\s_|▌█▏]+$/u, "");
+  for (const [key, list] of Object.entries(samples)) {
+    let fin = "";
+    for (let i = list.length - 1; i >= 0; i--) if (list[i][1] && list[i][2]) { fin = list[i][2]; break; }
+    if (!fin) fin = list.reduce((a, s) => (s[2].length > a.length ? s[2] : a), "");
+    meta[key].text = stripCursor(fin);
+  }
+
   // outermost clips under the root (the "scenes" check groups by), used by fit
   const clips = [...root.querySelectorAll("[data-start]")].filter((c) => {
     for (let e = c.parentElement; e && e !== root; e = e.parentElement) if (e.hasAttribute("data-start")) return false;
