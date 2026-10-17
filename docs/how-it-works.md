@@ -2,9 +2,9 @@
 
 ## 1. Probe (`src/probe.js`)
 
-The composition's `index.html` is opened from disk in headless Chromium at 1920×1080. readpace waits for `window.__timelines` and then, for t = 0, 0.1, 0.2 … up to the root `data-duration`, seeks **every** registered timeline to t and inspects the page.
+The composition's `index.html` is opened from disk in headless Chromium at 1920×1080. Before the page's own scripts run, readpace provides the globals the HyperFrames runtime would (`window.__timelines`, and `window.__hyperframes.getVariables()` returning the defaults declared in `data-composition-variables`), so compositions written for the runtime load as they would in Studio. It waits for the `load` event — not network idle, which `<video>`/`<audio>` never reach — and for web fonts, then for `window.__timelines`, and then, for t = 0, 0.1, 0.2 … up to the root `data-duration`, seeks **every** registered timeline to t and inspects the page.
 
-**Reading blocks.** For every non-empty text node, readpace walks up to the nearest ancestor whose computed `display` is not `inline*`. That element is one reading block, so `<em>`, `<b>` and `<span>` are read together with their surrounding line. Text inside `<script>`, `<style>` and `<svg>` is ignored. Blocks are keyed by `#id` or a short CSS path, so they can appear, change and disappear over time.
+**Reading blocks.** For every non-empty text node, readpace walks up to the nearest ancestor whose computed `display` is not `inline*`. That element is one reading block, so `<em>`, `<b>` and `<span>` are read together with their surrounding line. Text inside `<script>`, `<style>`, `<svg>`, `<template>` and anything marked `aria-hidden="true"` (decorative copies such as glitch layers) is ignored. Blocks are keyed by `#id` or a short CSS path, so they can appear, change and disappear over time.
 
 **Readable.** A block is readable at time t when
 

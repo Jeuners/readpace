@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html data-composition-variables='[{"id":"title","type":"string","label":"Title","default":"Defaults come from the declaration"}]'>
+<head><meta charset="UTF-8"></head>
+<body style="margin:0">
+<div id="root" data-composition-id="main" data-start="0" data-duration="2" data-width="1920" data-height="1080">
+  <div id="s1" class="clip" data-start="0" data-duration="2"><div id="t"></div></div>
+</div>
+<script>
+  // like compositions written for the HyperFrames runtime: no initialisation
+  document.getElementById("t").textContent = window.__hyperframes.getVariables().title;
+  window.__timelines["main"] = { seek() {} };
+</script>
+</body></html>

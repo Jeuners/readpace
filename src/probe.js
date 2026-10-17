@@ -2,6 +2,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import puppeteer from "puppeteer-core";
 import { findChrome } from "./browser.js";
+import { RUNTIME_SHIM } from "./runtime-shim.js";
 
 /**
  * Play a HyperFrames composition in headless Chromium and record, for every
@@ -24,7 +25,11 @@ export async function probe(indexHtml, { step = 0.1, chromePath } = {}) {
   try {
     const page = await browser.newPage();
     await page.setViewport({ width: 1920, height: 1080 });
-    await page.goto(pathToFileURL(path.resolve(indexHtml)).href, { waitUntil: "networkidle0" });
+    await page.evaluateOnNewDocument(RUNTIME_SHIM);
+    // "load", not "networkidle": <video>/<audio> keep fetching ranges and would
+    // never let the network go idle. Fonts matter for layout, so wait for them.
+    await page.goto(pathToFileURL(path.resolve(indexHtml)).href, { waitUntil: "load", timeout: 60000 });
+    await page.evaluate(() => document.fonts && document.fonts.ready);
     const root = await page.evaluate(() => {
       const el = document.querySelector("[data-composition-id]");
       return el ? { duration: parseFloat(el.dataset.duration) } : null;
@@ -79,7 +84,7 @@ function sampleTimeline(STEP) {
     const walk = (node) => {
       for (const c of node.childNodes) {
         if (c.nodeType === Node.TEXT_NODE) out += c.nodeValue;
-        else if (c.nodeType !== Node.ELEMENT_NODE || SKIP.has(c.tagName)) continue;
+        else if (c.nodeType !== Node.ELEMENT_NODE || SKIP.has(c.tagName) || c.getAttribute("aria-hidden") === "true") continue;
         else if (c.tagName === "BR" || !isInline(c)) out += " ";
         else walk(c);
       }
@@ -94,7 +99,8 @@ function sampleTimeline(STEP) {
     for (let n = walker.nextNode(); n; n = walker.nextNode()) {
       if (!n.nodeValue.trim()) continue;
       let el = n.parentElement;
-      if (!el || el.closest("script,style,svg,template")) continue;
+      // decorative copies (glitch layers etc.) are marked aria-hidden: not reading text
+      if (!el || el.closest("script,style,svg,template,[aria-hidden='true']")) continue;
       while (el !== root && isInline(el)) el = el.parentElement;
       set.add(el);
     }

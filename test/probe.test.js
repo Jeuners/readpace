@@ -31,9 +31,21 @@ test("nested blocks: each block counts only its own text", { skip: !chrome && "n
   assert.deepEqual(Object.values(r.meta).map((m) => m.text).sort(), ["Intro words here", "one two three four five six"]);
 });
 
-test("per-character spans (SplitText) are joined into words; <br> separates", { skip: !chrome && "no Chrome found", timeout: 60000 }, async () => {
+test("per-character spans (SplitText) are joined into words; <br> separates; aria-hidden is skipped", { skip: !chrome && "no Chrome found", timeout: 60000 }, async () => {
   const fixture = fileURLToPath(new URL("./fixtures/split.html", import.meta.url));
   const r = await probe(fixture, { chromePath: chrome });
   const texts = Object.values(r.meta).map((m) => m.text).sort();
-  assert.deepEqual(texts, ["Hello you", "Use SPF-records and email auth now"]);
+  assert.deepEqual(texts, ["Hello you", "Real", "Use SPF-records and email auth now"]);
+});
+
+test("compositions with <video>/<audio> do not hang the probe", { skip: !chrome && "no Chrome found", timeout: 60000 }, async () => {
+  const fixture = fileURLToPath(new URL("./fixtures/media.html", import.meta.url));
+  const r = await probe(fixture, { chromePath: chrome });
+  assert.deepEqual(Object.values(r.meta).map((m) => m.text), ["Video and audio must not block the probe"]);
+});
+
+test("compositions that rely on runtime globals (__timelines, getVariables) work", { skip: !chrome && "no Chrome found", timeout: 60000 }, async () => {
+  const fixture = fileURLToPath(new URL("./fixtures/no-init.html", import.meta.url));
+  const r = await probe(fixture, { chromePath: chrome });
+  assert.deepEqual(Object.values(r.meta).map((m) => m.text), ["Defaults come from the declaration"]);
 });

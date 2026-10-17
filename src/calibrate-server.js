@@ -5,6 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { addRecords } from "./calibration.js";
 import { solveScale } from "./model.js";
+import { injectShim } from "./runtime-shim.js";
 
 const PAGE = path.join(path.dirname(fileURLToPath(import.meta.url)), "calibrate.html");
 
@@ -137,7 +138,9 @@ export function serveCalibration({ projectDir, plan, project, port = 8765, calib
           res.writeHead(404);
           return res.end();
         }
-        res.writeHead(200, { "Content-Type": TYPES[path.extname(file).toLowerCase()] || "application/octet-stream" });
+        const type = TYPES[path.extname(file).toLowerCase()] || "application/octet-stream";
+        res.writeHead(200, { "Content-Type": type });
+        if (type.startsWith("text/html")) return res.end(injectShim(fs.readFileSync(file, "utf8")));
         return fs.createReadStream(file).pipe(res);
       }
       res.writeHead(404);

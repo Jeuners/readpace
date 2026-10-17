@@ -1,0 +1,10 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"></head>
+<body style="margin:0">
+<div id="root" data-composition-id="main" data-start="0" data-duration="2" data-width="1920" data-height="1080">
+  <video id="v" class="clip" src="media.mp4" data-start="0" data-duration="2" muted></video>
+  <audio id="a" src="media.wav" data-start="0" data-duration="2"></audio>
+  <div id="s1" class="clip" data-start="0" data-duration="2"><div id="t">Video and audio must not block the probe</div></div>
+</div>
+<script>window.__timelines = { main: { seek() {} } };</script>
+</body></html>
